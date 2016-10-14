@@ -90,6 +90,18 @@ assert(function () {
 }, "Expected deep inequality");
 
 assert(function () {
+    var A = [1, 2, {
+        x: 7
+    }, 4, 5, undefined];
+
+    var B = [1, 2, {
+        x: 7,
+    }, 4, 5];
+
+    return !OT.deepEqual(A, B);
+}, "Expected deep inequality");
+
+assert(function () {
     var A = {
         x: 5,
         y: 7
