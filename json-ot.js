@@ -256,84 +256,28 @@ var arrays = OT.arrays = function (o_A, B, path, ops) {
         // A is longer than B
         // there has been a deletion
 
-        var newMethod = 1;
-
-        newMethod && (function () {
-            var commonStart;
-            var commonEnd;
-
-            var i = 0;
-
-            while (deepEqual(A[i], B[i])) { i++; }
-            commonStart = i;
-
-            i = 0;
-            while (deepEqual(A[A.length - 1 - i],B[B.length - 1 - i])) { i++; }
-            commonEnd = A.length - i;
-
-            var insertion = B.slice(commonStart, commonEnd  + 1);
-
-            //console.log(insertion);
-
-            var removal = commonEnd - commonStart;
-
-            // (ops, path,    offset, insertion, deletion, [value1, value2, ...])
-            splice(ops, path, insertion, commonStart, removal);
-        }());
-
-        if (newMethod) { return ops; }
-
-        // seeking to replace the code below...
-
-        B.forEach(function (b, i) {
-            var t_a = type(A[i]);
-            var t_b = type(b);
-
-            var old = A[i];
-            var nextPath = path.concat(i);
-
-            if (t_a !== t_b) {
-                // type changes are always destructive
-                // that's good news because destructive is easy
-                if (t_b === 'undefined') {
-                    // assumes that our input is coming from parsing a stringified array
-                    throw new Error('this should never happen');
-                }
-                if (t_a === 'undefined' && i >= A.length) {
-                    splice(ops, path, b, i, 0);
-                } else {
-                    replace(ops, nextPath, b, old);
-                }
-            } else {
-                // same type
-                switch (t_b) {
-                    case 'object':
-                        objects(A[i], b, nextPath, ops);
-                        break;
-                    case 'array':
-                        arrays(A[i], b, nextPath, ops);
-                        break;
-                    default:
-                        if (b !== A[i]) {
-                            replace(ops, path, b, old); // VERIFY
-                        }
-                        break;
-                }
-            }
-        });
-
-        if (l_A > l_B) {
-            // A was longer than B, so there have been deletions
-            var i = l_B;
-            var t_a;
-
-            // iterate backwards, passing the value to remove
-            for (; i <= l_B; i++) {
-                remove(ops, path, A[i]);
-            }
+        if (A.length === 0) {
+            splice(ops, path, B, 0, 0);
+            return ops;
         }
 
-        //A.length = l_B; ???
+        var commonStart;
+        var commonEnd;
+
+        var i = 0;
+
+        while ((i < A.length || i < B.length) && deepEqual(A[i], B[i])) { i++; }
+        commonStart = i;
+
+        i = 0;
+        while ((i < A.length || i < B.length) && deepEqual(A[A.length - 1 - i], B[B.length - 1 - i])) { i++; }
+        commonEnd = A.length - i;
+
+        var insertion = B.slice(commonStart, commonEnd  + 1);
+
+        var removal = commonEnd - commonStart;
+
+        splice(ops, path, insertion, commonStart, removal);
         return ops;
     }
 
