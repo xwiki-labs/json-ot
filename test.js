@@ -108,17 +108,6 @@ var changeSet = function (O, A, B) {
     return OT.resolve(OT.diff(O, A), OT.diff(O, B));
 };
 
-
-// OT Case #1 replace->replace ✔
-// OT Case #2 replace->remove ✔
-// OT Case #3 replace->splice
-// OT Case #4 remove->replace
-// OT Case #5 remove->remove ✔
-// OT Case #6 remove->splice
-// OT Case #7 splice->replace ✔
-// OT Case #8 splice->remove
-// OT Case #9 splice->splice ✔
-
 assert(function () {
     var O = { a: 5 };
     var A = { a: 6 };
@@ -170,9 +159,21 @@ assert(function () {
 }, "");
 
 assert(function () {
-    var changes = changeSet([[]], [[1]], [[2]]);
-    //console.log(changes);
-    return changes[1].offset === 1;
+    var O = [[]];
+    var A = [[1]];
+    var B = [[2]];
+
+    var changes = changeSet(O, A, B);
+
+    OT.patch(O, changes);
+
+    //console.log(
+    if (!(changes.length === 2 && changes[1].offset === 1 &&
+        OT.deepEqual(O, [[1,2]]))) {
+        //console.log(changes);
+        return O;
+    }
+    return true;
 }, "Expected A to take precedence over B when both push");
 
 assert(function () { // UNSHIFT is hairy
@@ -187,9 +188,12 @@ assert(function () { // UNSHIFT is hairy
     var changes = changeSet(O, A, B);
 
     //console.log(changes);
+    OT.patch(O, changes);
 
-    if (changes[0].type !== 'splice') {
-        return changes;
+    if (changes.length && [0].type !== 'splice') {
+        //console.log(changes);
+        return O;
+        //return changes;
     }
     return true;
 }, "Expected unshift to result in a splice operation");
@@ -253,7 +257,7 @@ assert(function () {
 
 // replace->splice
 // TODO
-assert(function () {
+assert(function (expected) {
     var O = [{x:5}];
 
     var A = OT.clone(O);
@@ -266,33 +270,30 @@ assert(function () {
     OT.patch(O, changes);
 
     if (!(changes.length === 2 &&
-        Sortify(O) === Sortify([3, {x: 7}]))) {
+        Sortify(O) === Sortify(expected))) {
         return {
             changes: changes,
             result: O,
         };
     }
     return true;
-}, "replace->splice (Case #3)");
+}, "replace->splice (Case #3)",
+
+[3, {x: 7}]
+);
 
 // remove->replace
-// FIXME
 assert(function () {
-    var O = {
-        x: 5,
-    };
-
+    var O = { x: 5, };
     var A = { };
-
-    var B = {
-        x: 7,
-    };
+    var B = { x: 7, };
 
     var changes = changeSet(O, A, B);
-
     OT.patch(O, changes);
 
     if (!(changes.length === 1 && Sortify(O) === Sortify({ x: 7 }))) {
+        //console.log(changes);
+        //console.log(O);
         return changes;
     }
     return true;
@@ -313,7 +314,7 @@ assert(function () {
 
 // remove->splice
 // TODO
-assert(function () {
+assert(function (expected) {
     var O = [{x:5}];
     var A = [{}];
     var B = [2, {x: 5}];
@@ -322,13 +323,14 @@ assert(function () {
     OT.patch(O, changes);
 
     if (!(changes.length === 2 &&
-        Sortify(O) === Sortify([2, {}]))) {
-        return O;
-        return Sortify(O);
-        return changes;
+        Sortify(O) === Sortify(expected))) {
+        return {
+            changes: changes,
+            result: O
+        };
     }
     return true;
-}, "remove->splice (Case #6)");
+}, "remove->splice (Case #6)", [2, {}]);
 
 // splice->replace
 assert(function () {
