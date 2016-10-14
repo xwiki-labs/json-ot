@@ -1,5 +1,4 @@
 var OT = require("./json-ot");
-var Sortify = require("./json-sortify");
 
 var assertions = 0;
 var failed = false;
@@ -116,8 +115,7 @@ assert(function () {
     var changes = changeSet(O, A, B);
     OT.patch(O, changes);
 
-    if (!(changes.length === 1 &&
-        Sortify(O) === Sortify({ a: 6 }))) {
+    if (!(changes.length === 1 && OT.deepEqual(O, {a:6}))) {
         return changes;
     }
     return true;
@@ -133,7 +131,7 @@ assert(function () {
     OT.patch(O, changes);
 
     return changes.length === 2 &&
-        Sortify(O) === Sortify({
+        OT.deepEqual(O, {
             x: 7,
             y: 9
         });
@@ -191,8 +189,7 @@ assert(function (expected) { // UNSHIFT is hairy
     OT.patch(O, changes);
 
     if (changes.length && [0].type === 'splice' &&
-        Sortify(O) === Sortify(expected)) {
-        //console.log(changes);
+        OT.deepEqual(O, expected)) {
         return O;
     }
     return true;
@@ -213,7 +210,7 @@ assert(function () {
     var changes = changeSet(O, A, B);
     OT.patch(O, changes);
 
-    return Sortify(O) === Sortify({x:5, y: 7});
+    return OT.deepEqual(O, {x:5, y: 7});
 }, "replace->replace (Case #1 No conflict)");
 
 assert(function () { // simple merge with deletions
@@ -224,7 +221,7 @@ assert(function () { // simple merge with deletions
     var changes = changeSet(O, A, B);
     OT.patch(O, changes);
 
-    return Sortify(O) === Sortify({x:5, y: 7});
+    return OT.deepEqual(O, {x:5, y: 7});
 }, "simple merge with deletions");
 
 // remove->remove
@@ -237,7 +234,7 @@ assert(function () {
 
     OT.patch(O, changes);
 
-    return changes.length === 1 && Sortify(O) === Sortify({})
+    return changes.length === 1 && OT.deepEqual(O, {});
 }, "Identical removals should be deduplicated");
 
 // replace->remove
@@ -257,7 +254,7 @@ assert(function () {
     //console.log(changes);
 
     OT.patch(O, changes);
-    return changes.length === 1 && Sortify(O) === Sortify({ x: 7 });
+    return changes.length === 1 && OT.deepEqual(O, { x: 7 });
 }, "replacements should override removals. (Case #2)");
 
 // replace->splice
@@ -275,7 +272,7 @@ assert(function (expected) {
     OT.patch(O, changes);
 
     if (!(changes.length === 2 &&
-        Sortify(O) === Sortify(expected))) {
+        OT.deepEqual(O, expected))) {
         return {
             changes: changes,
             result: O,
@@ -296,7 +293,7 @@ assert(function () {
     var changes = changeSet(O, A, B);
     OT.patch(O, changes);
 
-    if (!(changes.length === 1 && Sortify(O) === Sortify({ x: 7 }))) {
+    if (!(changes.length === 1 && OT.deepEqual(O, { x: 7 }))) {
         //console.log(changes);
         //console.log(O);
         return changes;
@@ -314,7 +311,7 @@ assert(function () {
 
     OT.patch(O, changes);
 
-    return changes.length === 1 && Sortify(O) === Sortify({})
+    return changes.length === 1 && OT.deepEqual(O, {})
 }, "identical removals should be deduped. (Case #5)");
 
 // remove->splice
@@ -328,7 +325,7 @@ assert(function (expected) {
     OT.patch(O, changes);
 
     if (!(changes.length === 2 &&
-        Sortify(O) === Sortify(expected))) {
+        OT.deepEqual(O, expected))) {
         return {
             changes: changes,
             result: O
@@ -353,12 +350,7 @@ assert(function () {
     var changes = changeSet(O, A, B);
     OT.patch(O, changes);
 
-    if (!(Sortify(O) === Sortify([
-        {
-            x:5
-        },
-        7
-    ]))) {
+    if (!(OT.deepEqual(O, [ { x:5 }, 7 ]))) {
         return changes;
     }
 
@@ -381,7 +373,7 @@ assert(function () {
     var changes = changeSet(O, A, B);
     OT.patch(O, changes);
 
-    if (Sortify(O) !== Sortify([ 7, { x:5 } ])) {
+    if (!OT.deepEqual(O, [ 7, { x:5 } ])) {
         return changes;
     }
 
@@ -420,7 +412,7 @@ assert(function (expected) {
 
     OT.patch(O, changes);
 
-    if (!(changes.length == 2 && Sortify(O) === expected)) {
+    if (!(changes.length == 2 && OT.deepEqual(O, expected))) {
         //console.log(changes);
         return {
             result: O,
@@ -432,19 +424,19 @@ assert(function (expected) {
     }
 
     return true;
-}, "splice->remove (Case #8)", Sortify([1, 2, {}]));
+}, "splice->remove (Case #8)", [1, 2, {}]);
 
 // splice->splice
-assert(function () {
+assert(function (expected) {
     var O = [];
     var A = ["one"];
     var B = ["two"];
 
     var changes = changeSet(O, A, B);
+    OT.patch(O, changes)
 
-    return changes.length === 2 &&
-        Sortify(OT.patch(OT.clone(O), changes)) === Sortify(['one', 'two']);
-}, "splice->splice (Case #9)");
+    return changes.length === 2 && OT.deepEqual(O, expected);
+}, "splice->splice (Case #9)", ['one', 'two']);
 
 assert(function (expected) {
     var O = {
@@ -470,12 +462,9 @@ assert(function (expected) {
     var C = OT.clone(O);
     OT.patch(C, changes);
 
-    if (!(Sortify(C) === Sortify(expected))) {
+    if (!OT.deepEqual(C, expected)) {
         console.log(changes);
         return;
-
-
-        return C; //changes;
     }
     return true;
 }, "Incorrect merge", {
@@ -505,7 +494,7 @@ assert(function () {
 
     OT.patch(C, changes);
 
-    if (!(Sortify(O) === Sortify(OO))) {
+    if (!OT.deepEqual(O, OO)) {
         return [O, OO];
     }
 
