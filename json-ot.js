@@ -79,7 +79,7 @@ var pathOverlaps = OT.pathOverlaps = function (A, B) {
 // OT Case #1 replace->replace ✔
 // OT Case #2 replace->remove ✔
 // OT Case #3 replace->splice
-// OT Case #4 remove->replace
+// OT Case #4 remove->replace ✔
 // OT Case #5 remove->remove ✔
 // OT Case #6 remove->splice
 // OT Case #7 splice->replace ✔
@@ -92,22 +92,29 @@ var resolve = OT.resolve = function (A, B) {
     }
 
     // deduplicate removals
-    return A
-        .filter(function (a) {
+    var A2 = OT.clone(A);
+
+    var A3 = A.filter(function (a) {
             // removals should not override replacements. (Case #4)
+            return a.type !== 'remove' || !B.some(function (b) { return b.type === 'replace' && OT.pathOverlaps(a.path, b.path); });
+            // TODO conflict callback
+        })
+        .map(function (a) {
             // "remove->splice (Case #6)"
                 // account for changed positions of removals
-            return true;
-        })
+            return a;
+        });
+
+    return A3
         .concat(B
         .filter(function (b) {
-            return !A.some(function (a) {
+            return !A3.some(function (a) {
                 return b.type === 'remove' && OT.pathOverlaps(a.path, b.path);
             });
         })
         .filter(function (b) {
             // let A win conflicts over b
-            return !A.some(function (a) {
+            return !A3.some(function (a) {
                 return b.type === 'replace' &&
                     OT.pathOverlaps(a.path, b.path);
             });
@@ -117,7 +124,7 @@ var resolve = OT.resolve = function (A, B) {
 
             // iterate over A such that each overlapping splice
             // adjusts the path/offset of b
-            A.forEach(function (a) {
+            A3.forEach(function (a) {
                 if (a.type === 'splice') {
                     if (pathOverlaps(a.path, b.path)) {
                         if (b.type === 'splice') {
