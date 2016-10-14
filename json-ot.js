@@ -66,6 +66,8 @@ var remove = OT.remove = function (ops, path, val) {
     ops.push(operation('remove', path, val));
 };
 
+
+// HERE
 var splice = OT.splice = function (ops, path, value, offset, removals) {
     ops.push(operation('splice', path, value, offset, removals));
 };
@@ -78,10 +80,10 @@ var pathOverlaps = OT.pathOverlaps = function (A, B) {
 
 // OT Case #1 replace->replace ✔
 // OT Case #2 replace->remove ✔
-// OT Case #3 replace->splice
+// OT Case #3 replace->splice ✔
 // OT Case #4 remove->replace ✔
 // OT Case #5 remove->remove ✔
-// OT Case #6 remove->splice
+// OT Case #6 remove->splice ✔
 // OT Case #7 splice->replace ✔
 // OT Case #8 splice->remove
 // OT Case #9 splice->splice ✔
@@ -92,43 +94,76 @@ var resolve = OT.resolve = function (A, B) {
     }
 
     // deduplicate removals
-    var A2 = OT.clone(A);
-
-    var A3 = A.filter(function (a) {
+    A = A.filter(function (a) {
             // removals should not override replacements. (Case #4)
             return a.type !== 'remove' || !B.some(function (b) { return b.type === 'replace' && OT.pathOverlaps(a.path, b.path); });
             // TODO conflict callback
         })
         .map(function (a) {
-            // "remove->splice (Case #6)"
-                // account for changed positions of removals
+            // splice->remove (Case #8)
+            B.forEach(function (b) {
+                if (b.type === 'splice') {
+                    if (pathOverlaps(b.path, a.path)) {
+                        if (a.type === 'splice') {
+                            a.offset += (b.value.length - b.removals);
+                        } else {}
+                    }
+                }
+            });
             return a;
         });
-
-    return A3
+    return A
         .concat(B
         .filter(function (b) {
-            return !A3.some(function (a) {
-                return b.type === 'remove' && OT.pathOverlaps(a.path, b.path);
+            // FIXME FALSE POSITIVE
+            return !A.some(function (a) {
+                return b.type === 'remove' && OT.deepEqual(a.path, b.path);
+                //OT.pathOverlaps(a.path, b.path);
             });
         })
         .filter(function (b) {
             // let A win conflicts over b
-            return !A3.some(function (a) {
-                return b.type === 'replace' &&
+            return !A.some(function (a) {
+                return b.type === 'replace' && a.type === 'replace' &&
                     OT.pathOverlaps(a.path, b.path);
             });
+        })
+        .map(function (b) {
+            // if a splice in A modifies the path to b
+            // update b's path to reflect that
+
+            A.forEach(function (a) {
+                if (a.type === 'splice') {
+                    if (OT.pathOverlaps(a.path, b.path)) {
+                        //console.log("PATH OVERLAPS: [%s] => [%s]", a.path.join(","), b.path.join(","));
+
+                        var pos = a.path.length;
+
+                        // FIXME make sure this is safe
+                        if (typeof(b.path[pos]) === 'number' && a.offset <= b.path[pos]) {
+                            b.path[pos] += (a.value.length - a.removals);
+                        }
+
+                        //console.log(a);
+                        //console.log(b);
+
+                    }
+                }
+            });
+
+
+            return b;
         })
         .map(function (b) {
             // resolve insertion overlaps array.push conflicts
 
             // iterate over A such that each overlapping splice
             // adjusts the path/offset of b
-            A3.forEach(function (a) {
+            A.forEach(function (a) {
                 if (a.type === 'splice') {
                     if (pathOverlaps(a.path, b.path)) {
                         if (b.type === 'splice') {
-                            b.offset += 1; // VERIFY
+                            b.offset += (a.value.length - a.removals);
                         } else {
                             // adjust the path of b to account for the splice
                         }
@@ -221,6 +256,35 @@ var arrays = OT.arrays = function (o_A, B, path, ops) {
         // A is longer than B
         // there has been a deletion
 
+        var newMethod = 1;
+
+        newMethod && (function () {
+            var commonStart;
+            var commonEnd;
+
+            var i = 0;
+
+            while (deepEqual(A[i], B[i])) { i++; }
+            commonStart = i;
+
+            i = 0;
+            while (deepEqual(A[A.length - 1 - i],B[B.length - 1 - i])) { i++; }
+            commonEnd = A.length - i;
+
+            var insertion = B.slice(commonStart, commonEnd  + 1);
+
+            //console.log(insertion);
+
+            var removal = commonEnd - commonStart;
+
+            // (ops, path,    offset, insertion, deletion, [value1, value2, ...])
+            splice(ops, path, insertion, commonStart, removal);
+        }());
+
+        if (newMethod) { return ops; }
+
+        // seeking to replace the code below...
+
         B.forEach(function (b, i) {
             var t_a = type(A[i]);
             var t_b = type(b);
@@ -232,6 +296,7 @@ var arrays = OT.arrays = function (o_A, B, path, ops) {
                 // type changes are always destructive
                 // that's good news because destructive is easy
                 if (t_b === 'undefined') {
+                    // assumes that our input is coming from parsing a stringified array
                     throw new Error('this should never happen');
                 }
                 if (t_a === 'undefined' && i >= A.length) {
@@ -268,7 +333,7 @@ var arrays = OT.arrays = function (o_A, B, path, ops) {
             }
         }
 
-        A.length = l_B;
+        //A.length = l_B; ???
         return ops;
     }
 
@@ -304,6 +369,7 @@ var arrays = OT.arrays = function (o_A, B, path, ops) {
             default:
                 if (A[i] !== B[i]) {
                     replace(ops, nextPath, B[i], old);
+                    //splice(ops, path, B[i], i, 1); // MAYBE?
                 }
                 break;
         }
@@ -346,7 +412,13 @@ var applyOp = OT.applyOp = function (O, op) {
                 console.error("[applyOp] expected path [%s] to exist in object", op.path.join(','));
                 throw new Error("Path did not exist");
             }
-            found.splice(op.offset, op.removals, op.value);
+            //found.splice(op.offset, op.removals, op.value);
+            //console.log(found);
+
+            if (type(found) !== 'array') { throw new Error("Can't splice non-array"); }
+
+            Array.prototype.splice.apply(found, [op.offset, op.removals].concat(op.value));
+            //console.log(found);
             break;
         case "remove":
             key = op.path[op.path.length -1];

@@ -176,7 +176,7 @@ assert(function () {
     return true;
 }, "Expected A to take precedence over B when both push");
 
-assert(function () { // UNSHIFT is hairy
+assert(function (expected) { // UNSHIFT is hairy
     var O = [{x: 5}];
 
     var A = OT.clone(O);
@@ -190,13 +190,18 @@ assert(function () { // UNSHIFT is hairy
     //console.log(changes);
     OT.patch(O, changes);
 
-    if (changes.length && [0].type !== 'splice') {
+    if (changes.length && [0].type === 'splice' &&
+        Sortify(O) === Sortify(expected)) {
         //console.log(changes);
         return O;
-        //return changes;
     }
     return true;
-}, "Expected unshift to result in a splice operation");
+}, "Expected unshift to result in a splice operation", [
+    'unshifted',
+    {
+        x: 7,
+    }
+]);
 
 assert(function () {
     // Simple merge application
@@ -406,11 +411,23 @@ assert(function (expected) {
         {}
     ];
 
-    var changes = changeSet(O, A, B);
+    ///var changes = changeSet(O, A, B);
+
+    var d_A = OT.diff(O, A);
+    var d_B = OT.diff(O, B);
+
+    var changes = OT.resolve(d_A, d_B);
+
     OT.patch(O, changes);
 
     if (!(changes.length == 2 && Sortify(O) === expected)) {
-        return O;
+        //console.log(changes);
+        return {
+            result: O,
+            //d_A: d_A,
+            //d_B: d_B,
+            changes: changes
+        };
         return changes;
     }
 
@@ -429,7 +446,7 @@ assert(function () {
         Sortify(OT.patch(OT.clone(O), changes)) === Sortify(['one', 'two']);
 }, "splice->splice (Case #9)");
 
-assert(function () {
+assert(function (expected) {
     var O = {
         x: [],
         y: { },
@@ -453,14 +470,21 @@ assert(function () {
     var C = OT.clone(O);
     OT.patch(C, changes);
 
-    return Sortify(C) === Sortify({
-        x: ['a', 'b'],
-        y: {
-            a: 5,
-        },
-        z: 'bang',
-    });
-}, "Incorrect merge");
+    if (!(Sortify(C) === Sortify(expected))) {
+        console.log(changes);
+        return;
+
+
+        return C; //changes;
+    }
+    return true;
+}, "Incorrect merge", {
+    x: ['a', 'b'],
+    y: {
+        a: 5,
+    },
+    z: 'bang',
+});
 
 // TODO
 assert(function () {
