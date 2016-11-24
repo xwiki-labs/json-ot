@@ -1,4 +1,8 @@
-var OT = require("./json-ot");
+#!/usr/bin/env node
+
+var OT = require("./JSON-ot");
+var TextPatcher = require("textpatcher");
+require("chainpad/chainpad.dist");
 
 var assertions = 0;
 var failed = false;
@@ -487,6 +491,109 @@ assert(function (expected) {
     z: 'bang',
 });
 
+/*
+var Op = {
+    apply: function (doc, op) {
+        return doc.slice(0,op.offset) +
+            op.toInsert + doc.slice(op.offset + op.toRemove);
+    },
+    equal: function (a, b) {
+        return a.offset === b.offset &&
+            a.toInsert === b.toInsert &&
+            a.toRemove === b.toRemove;
+    },
+    transform: function (t, a, b) {
+        if (Op.equal(a, b)) { return a; }
+
+        var s = [a, b].sort(function (x, y) {
+            return x.offset - y.offset;
+        }).reduce(function (x, y) {
+            var tmp = Op.apply(t, a);
+            b.offset += a.offset - a.toRemove;
+            return Op.apply(tmp, b);
+        });
+
+        console.log(s);
+        return s;
+    },
+};*/
+
+var transformText = function (O, A, B) {
+    var d1 = TextPatcher.diff(O, A);
+
+    //console.log(d1);
+    var d2 = TextPatcher.diff(O, B);
+
+    var r = ChainPad.Operation.transform0(O, d2, d1);
+
+    var doc = ChainPad.Operation.apply(r, O);
+    doc = ChainPad.Operation.apply(d1, doc);
+    return doc;
+};
+
+//false && 
+assert(function (expected) {
+    var O = "pewpew";
+    var A = "pewpew bang";
+    var B = "powpow";
+
+/*
+
+    console.log({
+        doc: doc,
+        r: r,
+        O: O,
+        A: A,
+        B: B,
+        d1: d1,
+        d2: d2,
+    });*/
+    return transformText(O, A, B) === expected;
+}, "", "powpow bang");
+
+//false && 
+assert(function (expected) {
+    var O = ["pewpew"];
+    var A = ["pewpew bang"];
+    var B = ["powpow"];
+
+    var changes = changeSet(O, A, B);
+
+    var d_A = OT.diff(O, A);
+    var d_B = OT.diff(O, B);
+
+    var changes = OT.resolve(d_A, d_B, function (a, b, t) {
+        var d1 = TextPatcher.diff(a.prev || "", a.value);
+        var d2 = TextPatcher.diff(b.prev || "", b.value);
+
+        var d3 = ChainPad.Operation.transform0(a.prev, d1, d2);
+
+        a.value = transformText(a.prev, a.value, b.value);
+
+/*      console.log("Arbiter this!");
+        console.log(JSON.stringify({
+            a:a,
+            b:b,
+            d1:d1,
+            d2:d2,
+            d3: d3,
+            t:t
+        }, null, 2));*/
+        return true;
+    });
+
+    //console.log(changes);
+    OT.patch(O, changes);
+
+    if (!OT.deepEqual(O, expected)) {
+        return {
+            result: O,
+            changes: changes,
+        };
+    }
+    return true;
+}, "diff/patching strings with overlaps", ["powpow bang"]);
+
 // TODO
 assert(function () {
     var O = {
@@ -512,6 +619,55 @@ assert(function () {
 
     return true;
 }, "Expected original objects to be unaffected. all operations must be pure");
+
+var isTransitive = function (O, A, B, C, m) {
+    var c_A = changeSet(O, A, B);
+    var c_B = changeSet(O, B, A);
+
+    var R = [c_A, c_B].map(function (c) {
+        var o = OT.clone(O);
+        OT.patch(o, c);
+        return o;
+    });
+
+    assert(function (C) {
+        if (!OT.deepEqual(R[0], C)) {
+            console.error("Result was not equal to expectation!");
+            return [R[0], C];
+        }
+        if (!OT.deepEqual(R[0], R[1])) {
+            console.log("Expected opposing transformations to produce equivalent output!");
+            return R;
+        }
+        return true;
+    }, m, C);
+};
+
+var ot = require("./json-ot");
+
+assert(function (expected) {
+    var actual = ot.transform('[]',
+        {type:'Operation', offset: 1, toInsert: '"a"', toRemove: 0},
+        {type:'Operation', offset: 1, toInsert: '"b"', toRemove: 0});
+
+    if (!OT.deepEqual(actual, expected)) {
+        return actual;
+    }
+    return true;
+}, "ot is incorrect", 
+    { type: 'Operation', offset: 1, toInsert: ',"b"', toRemove: 0 }
+);
+
+// HERE
+
+0 && isTransitive({}, {x: 5}, {y: 7}, {
+    x:5, y:7
+}, "pewpew!");
+
+0 && isTransitive([''], ['pew'], ['bang'], ['pewbang'], 'string transformations');
+
+0 && isTransitive([], ['umm'], ['bang'], ['umm', 'bang'], "array transformations");
+
 
 runASSERTS();
 

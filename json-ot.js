@@ -1,392 +1,223 @@
-(function () {
+(function (window) {
+var main = function (OT, TextPatcher) {
+    //var ChainPad = window.ChainPad;
 
-var OT = {};
+    var JsonOT = {};
 
-var isArray = OT.isArray = function (obj) {
-    return Object.prototype.toString.call(obj)==='[object Array]';
-};
+    var History = window.History = [];
 
-/*  Arrays and nulls both register as 'object' when using native typeof
-    we need to distinguish them as their own types, so use this instead. */
-var type = OT.type = function (dat) {
-    return dat === null?  'null': isArray(dat)?'array': typeof(dat);
-};
+    var now = function () { return +new Date(); };
 
-var find = OT.find = function (map, path) {
-    /* safely search for nested values in an object via a path */
-    return (map && path.reduce(function (p, n) {
-        return typeof p[n] !== 'undefined' && p[n];
-    }, map)) || undefined;
-};
+    var naiveOT = JsonOT.naiveOT = function (text, toTransform, transformBy) {
+        var DEBUG = window.REALTIME_DEBUG = window.REALTIME_DEBUG || {};
 
-var clone = OT.clone = function (val) {
-    return JSON.parse(JSON.stringify(val));
-};
+        var resultOp, text2, text3;
+        try {
+            resultOp = ChainPad.Operation.transform0(text, toTransform, transformBy);
 
-var deepEqual = OT.deepEqual = function (A, B) {
-    var t_A = type(A);
-    var t_B = type(B);
-    if (t_A !== t_B) { return false; }
-    if (t_A === 'object') {
-        var k_A = Object.keys(A);
-        var k_B = Object.keys(B);
-        return k_A.length === k_B.length &&
-            !k_A.some(function (a, i) { return !deepEqual(A[a], B[a]); }) &&
-            !k_B.some(function (b) { return !(b in A); });
-    } else if (t_A === 'array') {
-        return A.length === B.length &&
-            !A.some(function (a, i) { return !deepEqual(a, B[i]); });
-    } else {
-        return A === B;
-    }
-};
+            /*  if after operational transform we find that no op is necessary
+                return null to ignore this patch */
+            if (!resultOp) { return null; }
 
-var operation = OT.operation = function (type, path, value, prev, other) {
-    var res = {
-        type: type,
-        path: path,
-        value: value,
+            text2 = ChainPad.Operation.apply(transformBy, text);
+            text3 = ChainPad.Operation.apply(resultOp, text2);
+            try {
+                JSON.parse(text3);
+                return resultOp;
+            } catch (e) { }
+        } catch (x) { }
+        return null;
     };
-    if (type === 'replace') {
-        res.prev = prev;
-    }
-    else if (type === 'splice') {
-        res.offset = prev;
-        res.removals = other;
-    }
-    // if it's not a replace or splice, it's a 'remove'
-    return res;
-};
 
-var replace = OT.replace = function (ops, path, to, from) {
-    ops.push(operation('replace', path, to, from));
-};
+    var validate = JsonOT.validate = function (text, toTransform, transformBy) {
+        var DEBUG = window.REALTIME_DEBUG = window.REALTIME_DEBUG || {};
 
-var remove = OT.remove = function (ops, path, val) {
-    ops.push(operation('remove', path, val));
-};
+        var resultOp, text2, text3;
+        try {
+            // text = O (mutual common ancestor)
+            // toTransform = A (the first incoming operation)
+            // transformBy = B (the second incoming operation)
+            // threeway merge (0, A, B)
 
+            resultOp = ChainPad.Operation.transform0(text, toTransform, transformBy);
 
-// HERE
-var splice = OT.splice = function (ops, path, value, offset, removals) {
-    ops.push(operation('splice', path, value, offset, removals));
-};
+            /*  if after operational transform we find that no op is necessary
+                return null to ignore this patch */
+            if (!resultOp) { return null; }
 
-var pathOverlaps = OT.pathOverlaps = function (A, B) {
-    return !A.some(function (a, i) {
-        return a !== B[i];
-    });
-};
+            text2 = ChainPad.Operation.apply(transformBy, text);
+            text3 = ChainPad.Operation.apply(resultOp, text2);
+            try {
+                JSON.parse(text3);
+                return resultOp;
+            } catch (e) {
+                console.error(e);
+                var info = DEBUG.ot_parseError = {
+                    type: 'resultParseError',
+                    resultOp: resultOp,
 
-// OT Case #1 replace->replace ✔
-// OT Case #2 replace->remove ✔
-// OT Case #3 replace->splice ✔
-// OT Case #4 remove->replace ✔
-// OT Case #5 remove->remove ✔
-// OT Case #6 remove->splice ✔
-// OT Case #7 splice->replace ✔
-// OT Case #8 splice->remove
-// OT Case #9 splice->splice ✔
+                    toTransform: toTransform,
+                    transformBy: transformBy,
 
-var resolve = OT.resolve = function (A, B) {
-    if (!(type(A) === 'array' && type(B) === 'array')) {
-        throw new Error("[resolve] expected two arrays");
-    }
-
-    // deduplicate removals
-    A = A.filter(function (a) {
-            // removals should not override replacements. (Case #4)
-            return a.type !== 'remove' || !B.some(function (b) { return b.type === 'replace' && OT.pathOverlaps(a.path, b.path); });
-            // TODO conflict callback
-        })
-        .map(function (a) {
-            // splice->remove (Case #8)
-            B.forEach(function (b) {
-                if (b.type === 'splice') {
-                    if (pathOverlaps(b.path, a.path)) {
-                        if (a.type === 'splice') {
-                            a.offset += (b.value.length - b.removals);
-                        } else {}
-                    }
-                }
-            });
-            return a;
-        });
-    return A
-        .concat(B
-        .filter(function (b) {
-            // FIXME FALSE POSITIVE
-            return !A.some(function (a) {
-                return b.type === 'remove' && OT.deepEqual(a.path, b.path);
-                //OT.pathOverlaps(a.path, b.path);
-            });
-        })
-        .filter(function (b) {
-            // let A win conflicts over b
-            return !A.some(function (a) {
-                return b.type === 'replace' && a.type === 'replace' &&
-                    OT.pathOverlaps(a.path, b.path);
-            });
-        })
-        .map(function (b) {
-            // if a splice in A modifies the path to b
-            // update b's path to reflect that
-
-            A.forEach(function (a) {
-                if (a.type === 'splice') {
-                    if (OT.pathOverlaps(a.path, b.path)) {
-                        //console.log("PATH OVERLAPS: [%s] => [%s]", a.path.join(","), b.path.join(","));
-
-                        var pos = a.path.length;
-
-                        // FIXME make sure this is safe
-                        if (typeof(b.path[pos]) === 'number' && a.offset <= b.path[pos]) {
-                            b.path[pos] += (a.value.length - a.removals);
-                        }
-
-                        //console.log(a);
-                        //console.log(b);
-
-                    }
-                }
-            });
-
-
-            return b;
-        })
-        .map(function (b) {
-            // resolve insertion overlaps array.push conflicts
-
-            // iterate over A such that each overlapping splice
-            // adjusts the path/offset of b
-            A.forEach(function (a) {
-                if (a.type === 'splice') {
-                    if (pathOverlaps(a.path, b.path)) {
-                        if (b.type === 'splice') {
-                            b.offset += (a.value.length - a.removals);
-                        } else {
-                            // adjust the path of b to account for the splice
-                        }
-                    }
-                }
-            });
-            return b;
-        }));
-};
-
-// A, B, f, path, ops
-var objects = OT.objects = function (A, B, path, ops) {
-    var Akeys = Object.keys(A);
-    var Bkeys = Object.keys(B);
-
-    if (OT.type(ops) !== 'array') { ops = []; }
-
-    Bkeys.forEach(function (b) {
-        var t_b = type(B[b]);
-        var old = A[b];
-
-        var nextPath = path.concat(b);
-
-        if (Akeys.indexOf(b) === -1) {
-            // there was an insertion
-
-            // mind the fallthrough behaviour
-            if (t_b === 'undefined') {
-                throw new Error("undefined type has key. this shouldn't happen?");
+                    text1: text,
+                    text2: text2,
+                    text3: text3,
+                    error: e
+                };
+                console.log('Debugging info available at `window.REALTIME_DEBUG.ot_parseError`');
             }
-            return replace(ops, nextPath, B[b], old);
+        } catch (x) {
+            console.error(x);
+            window.DEBUG.ot_applyError = {
+                type: 'resultParseError',
+                resultOp: resultOp,
+
+                toTransform: toTransform,
+                transformBy: transformBy,
+
+                text1: text,
+                text2: text2,
+                text3: text3,
+                error: x
+            };
+            console.log('Debugging info available at `window.REALTIME_DEBUG.ot_applyError`');
         }
 
-        // else the key already existed
-        var t_a = type(A[b]);
-        if (t_a !== t_b) {
-            // its type changed!
-            console.log("type changed from [%s] to [%s]", t_a, t_b);
-            // type changes always mean a change happened
-            if (t_b === 'undefined') {
-                throw new Error("first pass should never reveal undefined keys");
-            }
-            replace(ops, nextPath, B[b], old);
-            return;
-        }
+        // returning **null** breaks out of the loop
+        // which transforms conflicting operations
+        // in theory this should prevent us from producing bad JSON
+        return null;
+    };
 
-        // values might have changed, if not types
-        if (['array', 'object'].indexOf(t_a) === -1) {
-            // it's not an array or object, so we can do deep equality
-            if (A[b] !== B[b]) {
-                replace(ops, nextPath, B[b], old);
-            }
-            return;
-        }
+    var transform = JsonOT.transform = function (s_O, toTransform, transformBy) {
+        //var result = JsonOT.validate(s_O, toTransform, transformBy);
+        //if (!result === null) { return result; }
 
-        if (t_a === 'object') {
-            // it's an object
-            OT.objects(A[b], B[b], nextPath, ops);
-        } else {
-            // it's an array
-            OT.arrays(A[b], B[b], nextPath, ops);
-        }
-    });
-    Akeys.forEach(function (a) {
-        if (a === "on" || a === "_events") { return; }
+        var DEBUG = window.REALTIME_DEBUG = window.REALTIME_DEBUG || {};
 
-        // the key was deleted
-        if (Bkeys.indexOf(a) === -1 || type(B[a]) === 'undefined') {
-            remove(ops, path.concat(a), A[a]);
-        }
-    });
+        try {
+            // XXX
+            var XXX = window.XXX = {
+                time: now(),
+                arbitrated: [],
+            };
 
-    return ops;
+            // apply the concerned operations, yielding stringified json
+
+            // parent state with incoming patch applied
+            var s_A = XXX.s_A = ChainPad.Operation.apply(transformBy, s_O);
+            // parent state with outgoing patch applied
+            var s_B = XXX.s_B = ChainPad.Operation.apply(toTransform, s_O);
+
+            // parse the parent and sibling states
+            var O = XXX.O = JSON.parse(s_O);
+
+            // parsed incoming state
+            var A = XXX.A = JSON.parse(s_A);
+
+            // parsed outgoing state
+            var B = XXX.B = JSON.parse(s_B);
+
+            // arbiter function determines what to do in case of conflicts
+            var arbiter = function (p_a, p_b, c) {
+                if (p_a.prev !== p_b.prev) { throw new Error("Parent values don't match!"); }
+
+                // logging info
+                var I = {};
+
+                var o = I.o = p_a.prev;
+                var a = I.a = p_a.value;
+                var b = I.b = p_b.value;
+
+                var o_a = I.o_a = TextPatcher.diff(o, a);
+                var o_b = I.o_b = TextPatcher.diff(o, b);
+
+                /*  given the parent text, the op to transform, and the incoming op
+                    return a transformed operation which takes the incoming
+                    op into account */
+                var o_x = I.o_x = ChainPad.Operation.transform0(o, o_b, o_a);
+
+                /*  Apply the incoming operation to the parent text
+                */
+                var x2 = I.x2 = ChainPad.Operation.apply(o_a, o);
+
+                /*  Apply the transformed operation to the result of the incoming op
+                */
+                var x3 = I.x3 = ChainPad.Operation.apply(o_x, x2);
+
+                p_a.value = x3;
+
+                console.info(JSON.stringify(I, null, 2));
+                //History.push(I);
+
+                XXX.arbitrated.push(I);
+
+                return true;
+            };
+
+            // Diff of incoming state and parent state
+            var o_A = XXX.o_A = OT.diff(O, A);
+
+            // Diff of outgoing state and parent state
+            var o_B = XXX.o_B = OT.diff(O, B);
+
+            // resolve changesets of A and B
+
+            /*  FIXME reversed these because otherwise splices happen in the wrong order
+                [b, a] instead of [a, b] */
+            var C = XXX.C = OT.resolve(o_B, o_A, arbiter);
+
+            // Patch O for both sets of changes
+            OT.patch(O, C);
+
+            var s_C = XXX.s_C = JSON.stringify(O);
+
+            var s_A = XXX.s_A = ChainPad.Operation.apply(transformBy, s_O);
+
+
+
+
+                /// EWW HACK
+            var inverted = ChainPad.Operation.invert(transformBy, s_O);
+
+
+            
+
+            // plus artifact?
+            var s_final = ChainPad.Operation.apply(inverted, s_C);
+
+
+            /*  FIXME: undo changes from incoming state so we can isolate our
+             *  transformation.
+             *
+             *  AKA isolate merge artifact
+             */
+
+            //console.log(s_C);
+            //var d_C = XXX.d_C = TextPatcher.diff(s_O, s_A);
+            var d_C = XXX.d_C = TextPatcher.diff(s_O, s_final);
+
+            History.push(XXX);
+
+            return d_C;
+        } catch (err) {
+            console.error(err);
+            return null;
+        }
+    };
+
+    return JsonOT;
 };
 
-var arrays = OT.arrays = function (o_A, B, path, ops) {
-    if (OT.type(ops) !== 'array') { ops = []; }
-
-    var A = o_A.slice(0);
-
-    var l_A = A.length;
-    var l_B = B.length;
-
-    if (l_A !== l_B) {
-        // B is longer than A
-        // there has been an insertion (splice)
-
-        // OR
-
-        // A is longer than B
-        // there has been a deletion
-
-        if (A.length === 0) {
-            splice(ops, path, B, 0, 0);
-            return ops;
-        }
-
-        var commonStart;
-        var commonEnd;
-
-        var i = 0;
-
-        while ((i < A.length || i < B.length) && deepEqual(A[i], B[i])) { i++; }
-        commonStart = i;
-
-        i = 0;
-        while ((i < A.length || i < B.length) && deepEqual(A[A.length - 1 - i], B[B.length - 1 - i])) { i++; }
-        commonEnd = A.length - i;
-
-        var insertion = B.slice(commonStart, commonEnd  + 1);
-
-        var removal = commonEnd - commonStart;
-
-        splice(ops, path, insertion, commonStart, removal);
-        return ops;
-    }
-
-    // else they are the same length, iterate over their values
-    A.forEach(function (a, i) {
-        var t_a = type(a);
-        var t_b = type(B[i]);
-
-        var old = a;
-
-        var nextPath = path.concat(i);
-
-        // they have different types
-        if (t_a !== t_b) {
-            if (t_b === 'undefined') {
-                remove(ops, nextPath, old);
-            } else {
-                replace(ops, nextPath, B[i], old);
-            }
-            return;
-        }
-
-        // same type
-        switch (t_b) {
-            case 'undefined':
-                throw new Error('existing key had type `undefined`. this should never happen');
-            case 'object':
-                objects(A[i], B[i], nextPath, ops);
-                break;
-            case 'array':
-                arrays(A[i], B[i], nextPath, ops);
-                break;
-            default:
-                if (A[i] !== B[i]) {
-                    replace(ops, nextPath, B[i], old);
-                    //splice(ops, path, B[i], i, 1); // MAYBE?
-                }
-                break;
-        }
-    });
-    return ops;
-};
-
-var diff = OT.diff = function (A, B) {
-    var ops;
-
-    var t_A = type(A);
-    var t_B = type(B);
-
-    if (t_A !== t_B) {
-        throw new Error("Can't merge two objects of differing types");
-    }
-
-    if (t_B === 'array') {
-        return arrays(A, B, [], ops);
-    } else if (t_B === 'object') {
-        return objects(A, B, [], ops);
+    if (typeof(module) !== 'undefined' && module.exports) {
+        module.exports = main(require("./JSON-ot.js"), require("textpatcher"), require("chainpad/chainpad.dist.js"));
+    } else if ((typeof(define) !== 'undefined' && define !== null) && (define.amd !== null)) {
+        define([
+            '/bower_components/chainpad-json-validator/JSON-ot.js',
+            '/bower_components/textpatcher/TextPatcher.js',
+            '/bower_components/chainpad/chainpad.dist.js',
+        ], main);
     } else {
-        throw new Error("unsupported datatype" + t_B);
+        window.Json_OT = main(); // GLHF
     }
-    return ops;
-};
-
-var applyOp = OT.applyOp = function (O, op) {
-    var path;
-    var key;
-    switch (op.type) {
-        case "replace":
-            key = op.path[op.path.length -1];
-            path = op.path.slice(0, op.path.length - 1);
-            find(O, path)[key] = op.value;
-            break;
-        case "splice":
-            var found = find(O, op.path);
-            if (!found) {
-                console.error("[applyOp] expected path [%s] to exist in object", op.path.join(','));
-                throw new Error("Path did not exist");
-            }
-            //found.splice(op.offset, op.removals, op.value);
-            //console.log(found);
-
-            if (type(found) !== 'array') { throw new Error("Can't splice non-array"); }
-
-            Array.prototype.splice.apply(found, [op.offset, op.removals].concat(op.value));
-            //console.log(found);
-            break;
-        case "remove":
-            key = op.path[op.path.length -1];
-            path = op.path.slice(0, op.path.length - 1);
-            delete find(O, path)[key];
-            break;
-    }
-};
-
-var patch = OT.patch = function (O, ops) {
-    ops.forEach(function (op) {
-        applyOp(O, op);
-    });
-    return O;
-};
-
-if (typeof(module) !== 'undefined' && module.exports) {
-    module.exports = OT;
-} else if ((typeof(define) !== 'undefined' && define !== null) &&
-    (define.amd !== null)) {
-    define(function () { return OT; });
-} else {
-    window.Transform = OT;
-}
-
-}());
-
+}(this));
