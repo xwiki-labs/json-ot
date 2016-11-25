@@ -54,12 +54,10 @@ var operation = OT.operation = function (type, path, value, prev, other) {
     };
     if (type === 'replace') {
         res.prev = prev;
-    }
-    else if (type === 'splice') {
+    } else if (type === 'splice') {
         res.offset = prev;
         res.removals = other;
-    }
-    if (type !== 'remove') { throw new Error('expected a removal'); }
+    } else if (type !== 'remove') { throw new Error('expected a removal'); }
     // if it's not a replace or splice, it's a 'remove'
     return res;
 };
@@ -300,7 +298,7 @@ var arrayShallowEquality = function (A, B) {
   return true;
 }
 
-var cjdArrays = OT.cjdArrays = function (A_orig, B, path, ops) {
+var arrays = OT.arrays = function (A_orig, B, path, ops) {
   var A = A_orig.slice(0); // shallow clone
 
   if (A.length === 0) {
@@ -350,128 +348,6 @@ var cjdArrays = OT.cjdArrays = function (A_orig, B, path, ops) {
     splice(ops, path, toInsert, commonStart, toRemove);
 
   }
-};
-
-var arrays = OT.arrays = function (o_A, B, path, ops) {
-    var A = o_A.slice(0); // shallow clone
-
-    var l_A = A.length;
-    var l_B = B.length;
-
-    if (l_A !== l_B) {
-        // B is longer than A
-        // there has been an insertion (splice)
-
-        // OR
-
-        // A is longer than B
-        // there has been a deletion
-
-        if (A.length === 0) {
-            splice(ops, path, B, 0, 0);
-            return ops;
-        }
-
-        var commonStart;
-        var commonEnd;
-
-        var i = 0;
-
-        // TODO:  This deepEqual() is going to be the source of the slow
-        //        Possible solution is to deepEqualReplace() which replaces A with B in every case where deepEqual(A,B) then use ===
-        while (deepEqual(A[i], B[i])) { i++; }
-        commonStart = i;
-
-/*
-    var commonEnd = 0;
-    while (oldval.charAt(oldval.length - 1 - commonEnd) === newval.charAt(newval.length - 1 - commonEnd) &&
-        commonEnd + commonStart < oldval.length && commonEnd + commonStart < newval.length) {
-        commonEnd++;
-    }
-
-    var toRemove = 0;
-    var toInsert = '';
-
-    /  throw some assertions in here before dropping patches into the realtime 
-    if (oldval.length !== commonStart + commonEnd) {
-        toRemove = oldval.length - commonStart - commonEnd;
-    }
-    if (newval.length !== commonStart + commonEnd) {
-        toInsert = newval.slice(commonStart, newval.length - commonEnd);
-    }
-*/
-      var commonStart = 0;
-      var commonEnd = 0;
-      while (deepEqual(A[commonStart], B[commonStart])) { commonStart++; }
-      while (deepEqual(A[A.length - 1 - commonEnd], B[B.length - 1 - commonEnd]) &&
-          commonEnd + commonStart < A.length && commonEnd + commonStart < B.length)
-      {
-             commonEnd++;
-      }
-      var toRemove = A.length - commonStart - commonEnd;
-      var toInsert = [];
-      if (B.length !== commonStart + commonEnd) {
-          toInsert = B.slice(commonStart, B.length - commonEnd);
-      }
-      splice(ops, path, toInsert, commonStart, toRemove);
-
-      ///////
-        i = 0;
-        while ((i < A.length || i < B.length) && deepEqual(A[A.length - 1 - i], B[B.length - 1 - i])) { i++; }
-        commonEnd = A.length - i;
-
-        var insertion = B.slice(commonStart, commonEnd  + 1);
-
-        var removal = commonEnd - commonStart;
-
-        splice(ops, path, insertion, commonStart, removal);
-        return ops;
-    }
-
-    // else they are the same length, iterate over their values
-  // TODO: Behavior is very different for arrays of different length than for arrays of same length, this is wrong IMO
-  //       I would use the exact same logic as textPatcher (copy/pasted as much as possible but with 
-    A.forEach(function (a, i) {
-        var t_a = type(a);
-        var t_b = type(B[i]);
-
-        var old = a;
-
-        var nextPath = path.concat(i);
-
-        // they have different types
-        if (t_a !== t_b) {
-            // TODO: These should be splices
-            if (t_b === 'undefined') {
-                remove(ops, nextPath, old);
-            } else {
-                replace(ops, nextPath, B[i], old);
-            }
-            return;
-        }
-
-        // same type
-        // cjd: Here we drill down into the array, this is important because if nothing was changed at the level of this array itself,
-        //      we really don't want to do any removal/insertion here.
-        switch (t_b) {
-            case 'undefined':
-                throw new Error('existing key had type `undefined`. this should never happen');
-            case 'object':
-                objects(A[i], B[i], nextPath, ops);
-                break;
-            case 'array':
-                arrays(A[i], B[i], nextPath, ops);
-                break;
-            default:
-                if (A[i] !== B[i]) {
-                  // TODO: This should be a splice
-                    replace(ops, nextPath, B[i], old);
-                    //splice(ops, path, B[i], i, 1); // MAYBE?
-                }
-                break;
-        }
-    });
-    return ops;
 };
 
 var diff = OT.diff = function (A, B) {
@@ -542,4 +418,3 @@ if (typeof(module) !== 'undefined' && module.exports) {
 }
 
 }());
-

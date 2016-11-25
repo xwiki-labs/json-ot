@@ -1,0 +1,24 @@
+{
+  "name": "json-ot",
+  "version": "0.0.0",
+  "description": "``` var O = { x: 5, }; var A = { x: 7, }; var B = { x: 5, y: 9, };",
+  "main": "json-ot.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/xwiki-labs/json-ot.git"
+  },
+  "author": "",
+  "license": "AGPL-3.0+",
+  "bugs": {
+    "url": "https://github.com/xwiki-labs/json-ot/issues"
+  },
+  "homepage": "https://github.com/xwiki-labs/json-ot#readme",
+  "dependencies": {
+    "chainpad": "^0.2.5",
+    "json.sortify": "^2.0.2",
+    "textpatcher": "^1.3.0"
+  }
+}
