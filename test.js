@@ -3,6 +3,7 @@
 var OT = require("./JSON-ot");
 var TextPatcher = require("textpatcher");
 require("chainpad/chainpad.dist");
+var Sortify = require("json.sortify");
 
 var assertions = 0;
 var failed = false;
@@ -650,24 +651,57 @@ assert(function (expected) {
         {type:'Operation', offset: 1, toInsert: '"a"', toRemove: 0},
         {type:'Operation', offset: 1, toInsert: '"b"', toRemove: 0});
 
-    if (!OT.deepEqual(actual, expected)) {
-        return actual;
-    }
+    if (!OT.deepEqual(actual, expected)) { return actual; }
     return true;
 }, "ot is incorrect", 
     { type: 'Operation', offset: 1, toInsert: ',"b"', toRemove: 0 }
 );
 
-// HERE
+false && assert(function (expected) {
+    var O = '{}';
+    var A = TextPatcher.diff(O, Sortify({x: 5}));
+    var B = TextPatcher.diff(O, Sortify({y: 7}));
 
+    var actual = ot.transform('{}', A, B);
+    if (!OT.deepEqual(actual, expected)) { return actual; }
+    return true;
+}, 'ot on empty maps is incorrect', {
+    type: 'Operation', toInsert: ',"y":7', toRemove: 0, offset: 1
+});
+
+assert(function (expected) {
+    var O = '{}';
+    var A = TextPatcher.diff(O, Sortify({y: 5}));
+    var B = TextPatcher.diff(O, Sortify({x: 7}));
+
+    var actual = ot.transform('{}', A, B);
+    if (!OT.deepEqual(actual, expected)) {
+
+        //console.log(A);
+        //console.log(B);
+
+        var temp = ChainPad.Operation.apply(A, O);
+        temp = ChainPad.Operation.apply(actual, temp);
+        console.log(temp);
+
+
+        return actual;
+    }
+    return true;
+}, 'ot on empty maps is incorrect', {
+    type: 'Operation', toInsert: 'x":7,"', toRemove: 0, offset: 2
+});
+
+
+// HERE
+/*
 0 && isTransitive({}, {x: 5}, {y: 7}, {
     x:5, y:7
 }, "pewpew!");
 
 0 && isTransitive([''], ['pew'], ['bang'], ['pewbang'], 'string transformations');
 
-0 && isTransitive([], ['umm'], ['bang'], ['umm', 'bang'], "array transformations");
-
+0 && isTransitive([], ['umm'], ['bang'], ['umm', 'bang'], "array transformations");*/
 
 runASSERTS();
 

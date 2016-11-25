@@ -1,6 +1,7 @@
 (function (window) {
-var main = function (OT, TextPatcher) {
+var main = function (OT, TextPatcher, Sortify) {
     //var ChainPad = window.ChainPad;
+    var Operation = ChainPad.Operation;
 
     var JsonOT = {};
 
@@ -90,9 +91,6 @@ var main = function (OT, TextPatcher) {
     };
 
     var transform = JsonOT.transform = function (s_O, toTransform, transformBy) {
-        //var result = JsonOT.validate(s_O, toTransform, transformBy);
-        //if (!result === null) { return result; }
-
         var DEBUG = window.REALTIME_DEBUG = window.REALTIME_DEBUG || {};
 
         try {
@@ -147,8 +145,7 @@ var main = function (OT, TextPatcher) {
 
                 p_a.value = x3;
 
-                console.info(JSON.stringify(I, null, 2));
-                //History.push(I);
+                //console.log(Sortify);
 
                 XXX.arbitrated.push(I);
 
@@ -170,34 +167,49 @@ var main = function (OT, TextPatcher) {
             // Patch O for both sets of changes
             OT.patch(O, C);
 
-            var s_C = XXX.s_C = JSON.stringify(O);
+            // FIXME should be sortify
+            var s_C = XXX.s_C = Sortify(O);
 
-            var s_A = XXX.s_A = ChainPad.Operation.apply(transformBy, s_O);
+            var l1 = s_O.length + Operation.lengthChange(toTransform) +
+                Operation.lengthChange(transformBy);
+            if (l1 !== s_C.length) {
+                //console.error("input length: (%s), output length: (%s)", l1, s_C.length);
 
+                // you definitely need to do something because something is missing
+                // probably a comma
+            } else {
+                //var result = JsonOT.validate(s_O, toTransform, transformBy);
+                //if (result !== null) { return result; }
 
+                // if you haven't returned yet, that means OT.validate failed
+                // :(
+            }
 
+            // isolate the merge artifact
+            var d_C = XXX.d_C = TextPatcher.diff(s_B, s_C);
 
-                /// EWW HACK
-            var inverted = ChainPad.Operation.invert(transformBy, s_O);
+            if (d_C) {
+                var delta = Operation.lengthChange(toTransform);
+                var offset = d_C.offset - delta;
 
+                var debugThis = false;
 
-            
+                if (toTransform.offset < d_C.offset && ChainPad.Common.isUint(offset)) {
+                    if (debugThis) {
+                        console.log('transforming for: %s', s_O);
+                        console.log(d_C);
+                        console.log(toTransform);
 
-            // plus artifact?
-            var s_final = ChainPad.Operation.apply(inverted, s_C);
+                        console.log("result");
+                    }
 
-
-            /*  FIXME: undo changes from incoming state so we can isolate our
-             *  transformation.
-             *
-             *  AKA isolate merge artifact
-             */
-
-            //console.log(s_C);
-            //var d_C = XXX.d_C = TextPatcher.diff(s_O, s_A);
-            var d_C = XXX.d_C = TextPatcher.diff(s_O, s_final);
-
-            History.push(XXX);
+                    d_C.offset = offset;
+                    if (debugThis) {
+                        console.log(d_C);
+                        console.log();
+                    }
+                }
+            }
 
             return d_C;
         } catch (err) {
@@ -210,11 +222,16 @@ var main = function (OT, TextPatcher) {
 };
 
     if (typeof(module) !== 'undefined' && module.exports) {
-        module.exports = main(require("./JSON-ot.js"), require("textpatcher"), require("chainpad/chainpad.dist.js"));
+        module.exports = main(
+            require("./JSON-ot.js"),
+            require("textpatcher"),
+            require("json.sortify"),
+            require("chainpad/chainpad.dist.js"));
     } else if ((typeof(define) !== 'undefined' && define !== null) && (define.amd !== null)) {
         define([
             '/bower_components/chainpad-json-validator/JSON-ot.js',
             '/bower_components/textpatcher/TextPatcher.js',
+            'json.sortify',
             '/bower_components/chainpad/chainpad.dist.js',
         ], main);
     } else {
