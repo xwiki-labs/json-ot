@@ -112,6 +112,36 @@ var cases = (function () {
 
 //console.log(cases);
 
+/* stuff....   This is kind of a copy of Patch.transform() in ChainPad and the Operation.transform wants to be pluggable.
+        It would probably be a good idea to treat strings as if they were arrays and then let the transform function (basically resolve)
+        be pluggable.
+
+var cjdOt0 = OT.cjdOt0 = function (tt, tb) {
+    if (!pathOverlaps(tt.path, tb.path)) { return tt; }
+    if (tt.path.length === tb.path.length) {
+        if (tt.type === 'replace' && tb.type === 'replace' &&
+            typeof(tt.value) === 'string' && typeof(tb.value) === 'string')
+        {
+            // String diffing is done in here instead of being handled in the diff operation.
+
+            tt. HERE
+        }
+    }
+};
+
+var cjdOt = OT.cjdOt = function (toTransform, transformBy) {
+    var out = [];
+    for (var i = toTransform.length - 1; i >= 0; i--) {
+        for (var j = transformBy.length - 1; j >= 0; j--) {
+            toTransform[i] = cjdOt0(toTransform[i], transformBy[j]);
+            if (!toTransform.operations[i]) { break; }
+        }
+        if (toTransform.operations[i]) { out.push(toTransform.operations[i]) }
+    }
+    return out;
+}*/
+
+// A and B are lists of operations which result from calling diff
 var resolve = OT.resolve = function (A, B, arbiter) {
     if (!(type(A) === 'array' && type(B) === 'array')) {
         throw new Error("[resolve] expected two arrays");
@@ -133,6 +163,7 @@ var resolve = OT.resolve = function (A, B, arbiter) {
     // deduplicate removals
     A = A.filter(function (a) {
             // removals should not override replacements. (Case #4)
+            // TODO: consider the case where somebody deletes a document while someone else is typing inside of it
             return a.type !== 'remove' || !B.some(function (b) { return b.type === 'replace' && pathOverlaps(a.path, b.path); });
             // TODO conflict callback
         })
@@ -226,6 +257,9 @@ var resolve = OT.resolve = function (A, B, arbiter) {
             return b;
         });
 
+// TODO: To be equivilent to transform0 (the pluggable transform function)
+//       you would have to return only B. However because A is filtered in this function it is
+//       not enough to change only this line.
     return A.concat(B);
 };
 
@@ -287,17 +321,13 @@ var objects = OT.objects = function (A, B, path, ops) {
 var arrayShallowEquality = function (A, B) {
   if (A.length !== B.length) { return false; }
   for (var i = 0; i < A.length; i++) {
-    var a = A[i];
-    var b = B[i];
-    if (a === b) { continue; }
-    var t_a = type(a);
-    var t_b = type(b);
-    if (t_a !== t_b) { return false; }
-    if (t_a !== 'array' && t_a === 'object') { return false; }
+    if (type(A[i]) !== type(B[i])) { return false; }
   }
   return true;
 }
 
+// When an element in an array (number, string, bool) is changed, instead of a replace we
+// will do a splice(offset, [element], 1)
 var arrays = OT.arrays = function (A_orig, B, path, ops) {
   var A = A_orig.slice(0); // shallow clone
 
@@ -311,6 +341,7 @@ var arrays = OT.arrays = function (A_orig, B, path, ops) {
     // This means no change will be needed at the level of this array, only it's children.
     A.forEach(function (a, i) {
       var b = B[i];
+      if (b === a) { return; }
       var old = a;
       var nextPath = path.concat(i);
       switch (type(a)) {
@@ -323,10 +354,7 @@ var arrays = OT.arrays = function (A_orig, B, path, ops) {
           arrays(a, b, nextPath, ops);
           break;
         default:
-          if (a !== b) {
-            throw new Error("unexpected type difference");
-          }
-          break;
+          replace(ops, nextPath, b, old);
       }
     });
   } else {
@@ -334,7 +362,7 @@ var arrays = OT.arrays = function (A_orig, B, path, ops) {
     // to make an actual change to this array, not only it's children.
     var commonStart = 0;
     var commonEnd = 0;
-    while (deepEqual(A[commonStart], B[commonStart])) { commonStart++; }
+    while (commonStart < A.length && deepEqual(A[commonStart], B[commonStart])) { commonStart++; }
     while (deepEqual(A[A.length - 1 - commonEnd], B[B.length - 1 - commonEnd]) &&
            commonEnd + commonStart < A.length && commonEnd + commonStart < B.length)
     {
