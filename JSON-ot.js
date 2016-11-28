@@ -159,7 +159,6 @@ var resolve = OT.resolve = function (A, B, arbiter) {
      *
      */
 
-
     // deduplicate removals
     A = A.filter(function (a) {
             // removals should not override replacements. (Case #4)
@@ -218,6 +217,25 @@ var resolve = OT.resolve = function (A, B, arbiter) {
                   // (generally we merge these two together but it is probably best to allow the api customer to decide via a "strategy")
                   // Note that A might be removing *and* inserting because a splice is roughly equivilent to a ChainPad Operation
                   // Consult Transform0 :)
+
+
+            // resolve insertion overlaps array.push conflicts
+            // iterate over A such that each overlapping splice
+            // adjusts the path/offset of b
+
+                    if (OT.deepEqual(a.path, b.path)) {
+                        if (b.type === 'splice') {
+                          // what if the splice is a removal?
+                            b.offset += (a.value.length - a.removals);
+                          // if both A and B are removing the same thing
+                          // be careful
+                        } else {
+                            // adjust the path of b to account for the splice
+                            // TODO
+                        }
+                        return;
+                    }
+
                     if (pathOverlaps(a.path, b.path)) {
                       // TODO validate that this isn't an off-by-one error
                         var pos = a.path.length;
@@ -228,32 +246,6 @@ var resolve = OT.resolve = function (A, B, arbiter) {
                 }
             });
 
-            return b;
-        })
-        .map(function (b) {
-      // FIXME is this duplicating logic from above?
-      // I don't remember
-      // special case of above, can probably move this whole block up.  <-- cjd: +1
-
-            // resolve insertion overlaps array.push conflicts
-
-            // iterate over A such that each overlapping splice
-            // adjusts the path/offset of b
-            A.forEach(function (a) {
-                if (a.type === 'splice') {
-                    if (pathOverlaps(a.path, b.path)) {
-                        if (b.type === 'splice') {
-                          // what if the splice is a removal?
-                            b.offset += (a.value.length - a.removals);
-                          // if both A and B are removing the same thing
-                          // be careful
-                        } else {
-                            // adjust the path of b to account for the splice
-                            // TODO
-                        }
-                    }
-                }
-            });
             return b;
         });
 
