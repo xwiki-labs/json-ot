@@ -91,108 +91,84 @@ var main = function (OT, TextPatcher, Sortify) {
     };
 
     var transform = JsonOT.transform = function (s_O, toTransform, transformBy) {
-        var DEBUG = window.REALTIME_DEBUG = window.REALTIME_DEBUG || {};
+        try { var O = JSON.parse(s_O); }
+        catch (err) { throw new Error("original state was not valid json"); }
 
         try {
-            // XXX
-            var XXX = window.XXX = {
-                time: now(),
-                arbitrated: [],
-            };
-
-            // apply the concerned operations, yielding stringified json
-
             // parent state with incoming patch applied
-            var s_A = XXX.s_A = ChainPad.Operation.apply(transformBy, s_O);
-            // parent state with outgoing patch applied
-            var s_B = XXX.s_B = ChainPad.Operation.apply(toTransform, s_O);
-
-            // parse the parent and sibling states
-            var O = XXX.O = JSON.parse(s_O);
-
+            var s_A = Operation.apply(toTransform, s_O);
             // parsed incoming state
-            var A = XXX.A = JSON.parse(s_A);
+            var A = JSON.parse(s_A);
+        }
+        catch (err) { throw new Error('outgoing patch would result in invalid json'); }
 
+        try {
+            // parent state with outgoing patch applied
+            var s_B = Operation.apply(transformBy, s_O);
             // parsed outgoing state
-            var B = XXX.B = JSON.parse(s_B);
+            var B = JSON.parse(s_B);
+        }
+        catch (err) { throw new Error("wut"); }
+
+        try {
+            // apply the concerned operations, yielding stringified json
 
             // arbiter function determines what to do in case of conflicts
             var arbiter = function (p_a, p_b, c) {
                 if (p_a.prev !== p_b.prev) { throw new Error("Parent values don't match!"); }
 
-                // logging info
-                var I = {};
+                var o = p_a.prev;
+                var a = p_a.value;
+                var b = p_b.value;
 
-                var o = I.o = p_a.prev;
-                var a = I.a = p_a.value;
-                var b = I.b = p_b.value;
-
-                var o_a = I.o_a = TextPatcher.diff(o, a);
-                var o_b = I.o_b = TextPatcher.diff(o, b);
+                var o_a = TextPatcher.diff(o, a);
+                var o_b = TextPatcher.diff(o, b);
 
                 /*  given the parent text, the op to transform, and the incoming op
                     return a transformed operation which takes the incoming
                     op into account */
-                var o_x = I.o_x = ChainPad.Operation.transform0(o, o_b, o_a);
+                var o_x = Operation.transform0(o, o_b, o_a);
 
                 /*  Apply the incoming operation to the parent text
                 */
-                var x2 = I.x2 = ChainPad.Operation.apply(o_a, o);
+                var x2 = Operation.apply(o_a, o);
 
                 /*  Apply the transformed operation to the result of the incoming op
                 */
-                var x3 = I.x3 = ChainPad.Operation.apply(o_x, x2);
+                var x3 = Operation.apply(o_x, x2);
 
                 p_a.value = x3;
-
-                //console.log(Sortify);
-
-                XXX.arbitrated.push(I);
 
                 return true;
             };
 
             // Diff of incoming state and parent state
-            var o_A = XXX.o_A = OT.diff(O, A);
+            var o_A = OT.diff(O, A);
 
             // Diff of outgoing state and parent state
-            var o_B = XXX.o_B = OT.diff(O, B);
+            var o_B = OT.diff(O, B);
 
             // resolve changesets of A and B
 
             /*  FIXME reversed these because otherwise splices happen in the wrong order
                 [b, a] instead of [a, b] */
-            var C = XXX.C = OT.resolve(o_B, o_A, arbiter);
+
+            var C = OT.resolve(o_A, o_B, arbiter, true);
 
             // Patch O for both sets of changes
+            OT.patch(O, o_A);
             OT.patch(O, C);
 
-            // FIXME should be sortify
-            var s_C = XXX.s_C = Sortify(O);
-
-            var l1 = s_O.length + Operation.lengthChange(toTransform) +
-                Operation.lengthChange(transformBy);
-            if (l1 !== s_C.length) {
-                //console.error("input length: (%s), output length: (%s)", l1, s_C.length);
-
-                // you definitely need to do something because something is missing
-                // probably a comma
-            } else {
-                //var result = JsonOT.validate(s_O, toTransform, transformBy);
-                //if (result !== null) { return result; }
-
-                // if you haven't returned yet, that means OT.validate failed
-                // :(
-            }
+            var s_C = Sortify(O);
 
             // isolate the merge artifact
-            var d_C = XXX.d_C = TextPatcher.diff(s_B, s_C);
+            var d_C = TextPatcher.diff(s_A, s_C);
 
-            if (d_C) {
+            if (d_C && false) {
                 var delta = Operation.lengthChange(toTransform);
                 var offset = d_C.offset - delta;
 
-                var debugThis = false;
+                var debugThis = 0;
 
                 if (toTransform.offset < d_C.offset && ChainPad.Common.isUint(offset)) {
                     if (debugThis) {
@@ -211,9 +187,17 @@ var main = function (OT, TextPatcher, Sortify) {
                 }
             }
 
+            var temp = Operation.apply(toTransform, s_O);
+            temp = Operation.apply(d_C, temp);
+
+            //console.log(temp);
+            JSON.parse(temp);
+
             return d_C;
         } catch (err) {
+            console.error(temp);
             console.error(err);
+
             return null;
         }
     };

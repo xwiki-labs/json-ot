@@ -120,41 +120,52 @@ assert(function () {
     return !OT.deepEqual(A, B);
 }, "Expected deep inequality");
 
-var changeSet = function (O, A, B) {
-    return OT.resolve(OT.diff(O, A), OT.diff(O, B));
-};
-
-assert(function () {
+assert(function (E) {
     var O = { a: 5 };
     var A = { a: 6 };
     var B = { a: 7 };
 
-    var changes = changeSet(O, A, B);
+    var d_A = OT.diff(O, A);
+    var d_B = OT.diff(O, B);
+
+    var changes = OT.resolve(d_A, d_B);
+
+    OT.patch(O, d_A);
     OT.patch(O, changes);
 
-    if (!(changes.length === 1 && OT.deepEqual(O, {a:6}))) {
-        return changes;
-    }
+    if (!OT.deepEqual(O, E)) { return O; }
     return true;
-}, "replace->replace (Case #1 Conflicting)");
+}, "replace->replace (Case #1 Conflicting)",
+    {a: 6}
+);
 
 // independent replace -> replace
-assert(function () {
+assert(function (E) {
     var O = {x:5};
     var A = {x:7};
     var B = {x:5, y: 9};
 
-    var changes = changeSet(O, A, B);
+    var d_A = OT.diff(O, A);
+    var d_B = OT.diff(O, B);
+
+    var changes = OT.resolve(d_A, d_B);
+
+    OT.patch(O, d_A);
     OT.patch(O, changes);
 
-    return changes.length === 2 &&
-        OT.deepEqual(O, {
-            x: 7,
-            y: 9
-        });
-}, "Expected transform to result in two operations");
+    if (!(changes.length === 1 &&
+        OT.deepEqual(O, E))) {
+        return changes;
+    }
+    return true;
+}, "Expected transform to result in two operations",
+    {
+        x: 7,
+        y: 9
+    }
+);
 
-assert(function () {
+assert(function (expected) {
     var O = {
         x: 5,
     };
@@ -167,95 +178,137 @@ assert(function () {
     };
     var B = {z: 23};
 
-    var changes = changeSet(O, A, B);
-    //console.log(changes);
+    var d_A = OT.diff(O, A);
+    var d_B = OT.diff(O, B);
 
-    return changeSet.length === 3;
-}, "");
+    var changes = OT.resolve(d_A, d_B);
 
-assert(function () {
+    OT.patch(O, d_A);
+    OT.patch(O, changes);
+
+    if (!OT.deepEqual(O, expected)) { return changes; }
+    return true;
+}, "wat",
+    {
+        y: ["one", "two"],
+        z: 23
+    }
+);
+
+assert(function (E) {
     var O = [[]];
     var A = [[1]];
     var B = [[2]];
 
-    var changes = changeSet(O, A, B);
+    var d_A = OT.diff(O, A);
+    var d_B = OT.diff(O, B);
 
+    var changes = OT.resolve(d_A, d_B);
+
+    OT.patch(O, d_A);
     OT.patch(O, changes);
 
-    //console.log(
-    if (!(changes.length === 2 && changes[1].offset === 1 &&
-        OT.deepEqual(O, [[1,2]]))) {
-        //console.log(changes);
-        return O;
+    if (!(changes.length === 1  && OT.deepEqual(O, E))) {
+        return changes;
     }
     return true;
-}, "Expected A to take precedence over B when both push");
+}, "Expected A to take precedence over B when both push",
+    [[1, 2]]
+);
 
 assert(function (expected) { // UNSHIFT is hairy
     var O = [{x: 5}];
 
     var A = OT.clone(O);
-    A.unshift("unshifted");
+    A.unshift("unshifted"); // ["unshifted",{"x":5}]
 
     var B = OT.clone(O);
-    B[0].x = 7;
+    B[0].x = 7; // [{"x":7}]
 
-    var changes = changeSet(O, A, B);
+    var d_A = OT.diff(O, A);
+    var d_B = OT.diff(O, B);
 
-    //console.log(changes);
+    var changes = OT.resolve(d_A, d_B);
+
+    OT.patch(O, d_A);
     OT.patch(O, changes);
 
     if (changes.length && [0].type === 'splice' &&
         OT.deepEqual(O, expected)) {
         return O;
     }
-    return true;
-}, "Expected unshift to result in a splice operation", [
-    'unshifted',
-    {
-        x: 7,
-    }
-]);
 
-assert(function () {
+    if (!OT.deepEqual(O, expected)) { return O; }
+    return true;
+}, "Expected unshift to result in a splice operation", 
+    [ "unshifted", { x: 7} ]
+);
+
+assert(function (E) {
     // Simple merge application
 
     var O = { };
     var A = {x:5};
     var B = {y: 7};
 
-    var changes = changeSet(O, A, B);
+    var d_A = OT.diff(O, A);
+    var d_B = OT.diff(O, B);
+
+    var changes = OT.resolve(d_A, d_B);
+
+    OT.patch(O, d_A);
     OT.patch(O, changes);
 
-    return OT.deepEqual(O, {x:5, y: 7});
-}, "replace->replace (Case #1 No conflict)");
+    if (!OT.deepEqual(O, E)) {
+        return changes;
+    }
+
+    return true;
+}, "replace->replace (Case #1 No conflict)",
+    {x:5, y: 7}
+);
 
 assert(function () { // simple merge with deletions
     var O = {z: 17};
     var A = {x:5};
     var B = {y: 7};
 
-    var changes = changeSet(O, A, B);
+    var d_A = OT.diff(O, A);
+    var d_B = OT.diff(O, B);
+
+    var changes = OT.resolve(d_A, d_B);
+
+    OT.patch(O, d_A);
     OT.patch(O, changes);
 
-    return OT.deepEqual(O, {x:5, y: 7});
+    if (!OT.deepEqual(O, {x:5, y: 7})) {
+        return changes;
+    }
+    return true;
 }, "simple merge with deletions");
 
 // remove->remove
-assert(function () {
+assert(function (E) {
     var O = { x: 5, };
     var A = {};
     var B = {};
 
-    var changes = changeSet(O, A, B);
+    var d_A = OT.diff(O, A);
+    var d_B = OT.diff(O, B);
 
+    var changes = OT.resolve(d_A, d_B);
+
+    OT.patch(O, d_A);
     OT.patch(O, changes);
 
-    return changes.length === 1 && OT.deepEqual(O, {});
-}, "Identical removals should be deduplicated");
+    if (!(changes.length === 0 && OT.deepEqual(O, E))) {
+        return changes;
+    }
+    return true;
+}, "Identical removals should be deduplicated", {});
 
 // replace->remove
-assert(function () {
+assert(function (E) {
     var O = {
         x: 5,
     };
@@ -266,16 +319,24 @@ assert(function () {
 
     var B = { };
 
-    var changes = changeSet(O, A, B);
+    var d_A = OT.diff(O, A);
+    var d_B = OT.diff(O, B);
 
-    //console.log(changes);
+    var changes = OT.resolve(d_A, d_B);
 
+    OT.patch(O, d_A);
     OT.patch(O, changes);
-    return changes.length === 1 && OT.deepEqual(O, { x: 7 });
-}, "replacements should override removals. (Case #2)");
+
+    if (!(changes.length === 0 && OT.deepEqual(O, E))) {
+        return changes;
+    }
+
+    return true;
+}, "replacements should override removals. (Case #2)",
+    {x: 7}
+);
 
 // replace->splice
-// TODO
 assert(function (expected) {
     var O = [{x:5}];
 
@@ -285,10 +346,15 @@ assert(function (expected) {
     var B = OT.clone(O);
     B.unshift(3);
 
-    var changes = changeSet(O, A, B);
+    var d_A = OT.diff(O, A);
+    var d_B = OT.diff(O, B);
+
+    var changes = OT.resolve(d_A, d_B);
+
+    OT.patch(O, d_A);
     OT.patch(O, changes);
 
-    if (!(changes.length === 2 &&
+    if (!(changes.length === 1 &&
         OT.deepEqual(O, expected))) {
         return {
             changes: changes,
@@ -302,34 +368,49 @@ assert(function (expected) {
 );
 
 // remove->replace
-assert(function () {
+assert(function (expected) {
     var O = { x: 5, };
     var A = { };
     var B = { x: 7, };
 
-    var changes = changeSet(O, A, B);
+    var d_A = OT.diff(O, A);
+    var d_B = OT.diff(O, B);
+
+    var changes = OT.resolve(d_A, d_B);
+
+    OT.patch(O, d_A)
     OT.patch(O, changes);
 
-    if (!(changes.length === 1 && OT.deepEqual(O, { x: 7 }))) {
-        //console.log(changes);
-        //console.log(O);
+    if (!OT.deepEqual(O, expected)) {
         return changes;
     }
     return true;
-}, "removals should not override replacements. (Case #4)");
+}, "removals should not override replacements. (Case #4)",
+    {x: 7}
+);
 
 // remove->remove
-assert(function () {
+assert(function (E) {
     var O = { x: 5, };
     var A = {};
     var B = {};
 
-    var changes = changeSet(O, A, B);
+    var d_A = OT.diff(O, A);
+    var d_B = OT.diff(O, B);
 
+    var changes = OT.resolve(d_A, d_B);
+
+    OT.patch(O, d_A);
     OT.patch(O, changes);
 
-    return changes.length === 1 && OT.deepEqual(O, {})
-}, "identical removals should be deduped. (Case #5)");
+    if (!(changes.length === 0 && OT.deepEqual(O, E))) {
+        return changes;
+    }
+
+    return true;
+}, "identical removals should be deduped. (Case #5)",
+    {}
+);
 
 // remove->splice
 // TODO
@@ -338,10 +419,15 @@ assert(function (expected) {
     var A = [{}];
     var B = [2, {x: 5}];
 
-    var changes = changeSet(O, A, B);
+    var d_A = OT.diff(O, A);
+    var d_B = OT.diff(O, B);
+
+    var changes = OT.resolve(d_A, d_B);
+
+    OT.patch(O, d_A);
     OT.patch(O, changes);
 
-    if (!(changes.length === 2 &&
+    if (!(changes.length === 1 &&
         OT.deepEqual(O, expected))) {
         return {
             changes: changes,
@@ -352,7 +438,7 @@ assert(function (expected) {
 }, "remove->splice (Case #6)", [2, {}]);
 
 // splice->replace
-assert(function () {
+assert(function (E) {
     var O = [
         {
             x:5,
@@ -364,17 +450,24 @@ assert(function () {
 
     var B = OT.clone(O);
 
-    var changes = changeSet(O, A, B);
+    var a = OT.diff(O, A);
+    var b = OT.diff(O, B);
+
+    var changes = OT.resolve(a, b);
+
+    OT.patch(O, a);
     OT.patch(O, changes);
 
-    if (!(OT.deepEqual(O, [ { x:5 }, 7 ]))) {
+    if (!(OT.deepEqual(O, E))) {
         return changes;
     }
 
     return true;
-}, "splice->replace (Case #7)");
+}, "splice->replace (Case #7)",
+    [ { x:5 }, 7 ]
+);
 
-assert(function () {
+assert(function (E) {
     var O = [
         {
             x:5,
@@ -386,19 +479,24 @@ assert(function () {
 
     var B = OT.clone(O);
 
+    var a = OT.diff(O, A);
+    var b = OT.diff(O, B);
 
-    var changes = changeSet(O, A, B);
+    var changes = OT.resolve(a, b);
+
+    OT.patch(O, a);
     OT.patch(O, changes);
 
-    if (!OT.deepEqual(O, [ 7, { x:5 } ])) {
+    if (!OT.deepEqual(O, E)) {
         return changes;
     }
 
     return true;
-}, "splice->replace (Case #7)");
+}, "splice->replace (Case #7)",
+    [ 7, { x:5 } ]
+);
 
 // splice->remove
-// FIXME
 assert(function (expected) {
     var O = [
         1,
@@ -420,21 +518,17 @@ assert(function (expected) {
         {}
     ];
 
-    ///var changes = changeSet(O, A, B);
-
     var d_A = OT.diff(O, A);
     var d_B = OT.diff(O, B);
 
     var changes = OT.resolve(d_A, d_B);
 
+    OT.patch(O, d_A);
     OT.patch(O, changes);
 
-    if (!(changes.length == 2 && OT.deepEqual(O, expected))) {
-        //console.log(changes);
+    if (!OT.deepEqual(O, expected)) {
         return {
             result: O,
-            //d_A: d_A,
-            //d_B: d_B,
             changes: changes
         };
         return changes;
@@ -449,10 +543,19 @@ assert(function (expected) {
     var A = ["one"];
     var B = ["two"];
 
-    var changes = changeSet(O, A, B);
+    var a = OT.diff(O, A);
+    var b = OT.diff(O, B);
+
+    var changes = OT.resolve(a, b);
+
+    OT.patch(O, a);
     OT.patch(O, changes)
 
-    return changes.length === 2 && OT.deepEqual(O, expected);
+    if (!(changes.length === 1 && OT.deepEqual(O, expected))) {
+        console.log(O);
+        return changes;
+    }
+    return true;
 }, "splice->splice (Case #9)", ['one', 'two']);
 
 assert(function (expected) {
@@ -474,14 +577,18 @@ assert(function (expected) {
     A.z = "bang";
     B.z = "bam!";
 
-    var changes = changeSet(O, A, B);
+    var d_A = OT.diff(O, A);
+    var d_B = OT.diff(O, B);
+
+    var changes = OT.resolve(d_A, d_B);
 
     var C = OT.clone(O);
+
+    OT.patch(C, d_A);
     OT.patch(C, changes);
 
     if (!OT.deepEqual(C, expected)) {
-        console.log(changes);
-        return;
+        return changes;
     }
     return true;
 }, "Incorrect merge", {
@@ -492,37 +599,9 @@ assert(function (expected) {
     z: 'bang',
 });
 
-/*
-var Op = {
-    apply: function (doc, op) {
-        return doc.slice(0,op.offset) +
-            op.toInsert + doc.slice(op.offset + op.toRemove);
-    },
-    equal: function (a, b) {
-        return a.offset === b.offset &&
-            a.toInsert === b.toInsert &&
-            a.toRemove === b.toRemove;
-    },
-    transform: function (t, a, b) {
-        if (Op.equal(a, b)) { return a; }
-
-        var s = [a, b].sort(function (x, y) {
-            return x.offset - y.offset;
-        }).reduce(function (x, y) {
-            var tmp = Op.apply(t, a);
-            b.offset += a.offset - a.toRemove;
-            return Op.apply(tmp, b);
-        });
-
-        console.log(s);
-        return s;
-    },
-};*/
-
 var transformText = function (O, A, B) {
     var d1 = TextPatcher.diff(O, A);
 
-    //console.log(d1);
     var d2 = TextPatcher.diff(O, B);
 
     var r = ChainPad.Operation.transform0(O, d2, d1);
@@ -532,33 +611,18 @@ var transformText = function (O, A, B) {
     return doc;
 };
 
-//false && 
 assert(function (expected) {
     var O = "pewpew";
     var A = "pewpew bang";
     var B = "powpow";
 
-/*
-
-    console.log({
-        doc: doc,
-        r: r,
-        O: O,
-        A: A,
-        B: B,
-        d1: d1,
-        d2: d2,
-    });*/
     return transformText(O, A, B) === expected;
 }, "", "powpow bang");
 
-//false && 
 assert(function (expected) {
     var O = ["pewpew"];
     var A = ["pewpew bang"];
     var B = ["powpow"];
-
-    var changes = changeSet(O, A, B);
 
     var d_A = OT.diff(O, A);
     var d_B = OT.diff(O, B);
@@ -570,20 +634,10 @@ assert(function (expected) {
         var d3 = ChainPad.Operation.transform0(a.prev, d1, d2);
 
         a.value = transformText(a.prev, a.value, b.value);
-
-/*      console.log("Arbiter this!");
-        console.log(JSON.stringify({
-            a:a,
-            b:b,
-            d1:d1,
-            d2:d2,
-            d3: d3,
-            t:t
-        }, null, 2));*/
         return true;
     });
 
-    //console.log(changes);
+    OT.patch(O, d_A);
     OT.patch(O, changes);
 
     if (!OT.deepEqual(O, expected)) {
@@ -608,10 +662,14 @@ assert(function () {
     var A = {};
     var B = {b: 19};
 
-    var changes = changeSet(O, A, B);
+    var d_A = OT.diff(O, A);
+    var d_B = OT.diff(O, B);
+
+    var changes = OT.resolve(d_A, d_B);
 
     var C =  OT.clone(O);
 
+    OT.patch(C, d_A);
     OT.patch(C, changes);
 
     if (!OT.deepEqual(O, OO)) {
@@ -621,52 +679,43 @@ assert(function () {
     return true;
 }, "Expected original objects to be unaffected. all operations must be pure");
 
-var isTransitive = function (O, A, B, C, m) {
-    var c_A = changeSet(O, A, B);
-    var c_B = changeSet(O, B, A);
-
-    var R = [c_A, c_B].map(function (c) {
-        var o = OT.clone(O);
-        OT.patch(o, c);
-        return o;
-    });
-
-    assert(function (C) {
-        if (!OT.deepEqual(R[0], C)) {
-            console.error("Result was not equal to expectation!");
-            return [R[0], C];
-        }
-        if (!OT.deepEqual(R[0], R[1])) {
-            console.log("Expected opposing transformations to produce equivalent output!");
-            return R;
-        }
-        return true;
-    }, m, C);
-};
-
 var ot = require("./json-ot");
 
 assert(function (expected) {
+    var O = '[]';
+    var A = '["a"]';
+    var B = '["b"]';
+
     var actual = ot.transform('[]',
-        {type:'Operation', offset: 1, toInsert: '"a"', toRemove: 0},
-        {type:'Operation', offset: 1, toInsert: '"b"', toRemove: 0});
+        TextPatcher.diff(O, A),
+        TextPatcher.diff(O, B));
 
     if (!OT.deepEqual(actual, expected)) { return actual; }
     return true;
 }, "ot is incorrect", 
-    { type: 'Operation', offset: 1, toInsert: ',"b"', toRemove: 0 }
+    { type: 'Operation', offset: 4, toInsert: ',"b"', toRemove: 0 }
 );
 
-false && assert(function (expected) {
+assert(function (expected) {
     var O = '{}';
     var A = TextPatcher.diff(O, Sortify({x: 5}));
     var B = TextPatcher.diff(O, Sortify({y: 7}));
 
     var actual = ot.transform('{}', A, B);
-    if (!OT.deepEqual(actual, expected)) { return actual; }
+
+    var temp = ChainPad.Operation.apply(A, O);
+    temp = ChainPad.Operation.apply(actual, temp);
+
+    try { JSON.parse(temp); }
+    catch (e) { return temp; }
+
+    if (!OT.deepEqual(actual, expected)) {
+        return actual;
+    }
     return true;
 }, 'ot on empty maps is incorrect', {
-    type: 'Operation', toInsert: ',"y":7', toRemove: 0, offset: 1
+    // this is incorrect! // FIXME
+    type: 'Operation', toInsert: ',"y":7', toRemove: 0, offset: 6
 });
 
 assert(function (expected) {
@@ -675,16 +724,17 @@ assert(function (expected) {
     var B = TextPatcher.diff(O, Sortify({x: 7}));
 
     var actual = ot.transform('{}', A, B);
-    if (!OT.deepEqual(actual, expected)) {
 
-        //console.log(A);
-        //console.log(B);
+    var temp = ChainPad.Operation.apply(A, O);
+    temp = ChainPad.Operation.apply(actual, temp);
 
-        var temp = ChainPad.Operation.apply(A, O);
-        temp = ChainPad.Operation.apply(actual, temp);
+    try { JSON.parse(temp); }
+    catch (e) {
         console.log(temp);
+        throw e;
+    }
 
-
+    if (!OT.deepEqual(actual, expected)) {
         return actual;
     }
     return true;
@@ -692,16 +742,56 @@ assert(function (expected) {
     type: 'Operation', toInsert: 'x":7,"', toRemove: 0, offset: 2
 });
 
+assert(function (E) {
+    // define a parent state and create a string representation of it
+    var O = ['BODY', {}, [
+        ['P', {}, ['the quick red']]
+    ]];
+    var s_O = Sortify(O);
 
-// HERE
-/*
-0 && isTransitive({}, {x: 5}, {y: 7}, {
-    x:5, y:7
-}, "pewpew!");
+    // append text into a text node
+    var A = OT.clone(O);
+    A[2][0][2][0] = 'the quick red fox';
 
-0 && isTransitive([''], ['pew'], ['bang'], ['pewbang'], 'string transformations');
+    // insert a new paragraph at the top
+    var B = OT.clone(O);
+    B[2].unshift(['P', {}, [
+        'pewpew',
+    ]]);
 
-0 && isTransitive([], ['umm'], ['bang'], ['umm', 'bang'], "array transformations");*/
+    // infer necessary text operations
+    var o_A = TextPatcher.diff(s_O, Sortify(A));
+    var o_B = TextPatcher.diff(s_O, Sortify(B));
+
+    // construct a transformed text operation which takes into account the fact
+    // that we are working with JSON
+    var o_X = ot.transform(s_O, o_A, o_B);
+
+    if (!o_X) {
+
+        console.log(o_A);
+        console.log(o_B);
+        console.log(o_X);
+
+        throw new Error("Expected ot to result in a patch");
+    }
+
+    // apply both ops to the original document in the right order
+    var doc = ChainPad.Operation.apply(o_A, s_O);
+    doc = ChainPad.Operation.apply(o_X, doc);
+
+    // parse the result
+    var parsed = JSON.parse(doc);
+
+    // make sure it checks out
+    if (!OT.deepEqual(parsed, E)) { return parsed; }
+    return true;
+}, "failed to transform paragraph insertion and text node update in hyperjson",
+    ['BODY', {}, [
+        ['P', {}, ['pewpew']],
+        ['P', {}, ['the quick red fox']],
+    ]]
+);
 
 runASSERTS();
 

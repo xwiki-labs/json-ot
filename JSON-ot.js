@@ -142,6 +142,7 @@ var cjdOt = OT.cjdOt = function (toTransform, transformBy) {
 }*/
 
 // A and B are lists of operations which result from calling diff
+
 var resolve = OT.resolve = function (A, B, arbiter) {
     if (!(type(A) === 'array' && type(B) === 'array')) {
         throw new Error("[resolve] expected two arrays");
@@ -160,34 +161,41 @@ var resolve = OT.resolve = function (A, B, arbiter) {
      */
 
     // deduplicate removals
-    A = A.filter(function (a) {
-            // removals should not override replacements. (Case #4)
-            // TODO: consider the case where somebody deletes a document while someone else is typing inside of it
-            return a.type !== 'remove' || !B.some(function (b) { return b.type === 'replace' && pathOverlaps(a.path, b.path); });
-            // TODO conflict callback
-        })
-        .map(function (a) {
-            B.forEach(function (b) {
-                if (b.type === 'splice') {
-                    // BUG - what we want to do here is change the path because there was something added in an array where this operation is a sub-element
-                    if (pathOverlaps(b.path, a.path)) {
-                        if (a.type === 'splice') {
-                            a.offset += (b.value.length - b.removals);
-                        } else {}
-                    }
+    A.forEach(function (a) {
+        B.forEach(function (b) {
+            if (b.type === 'splice') {
+                // BUG - what we want to do here is change the path because
+                // there was something added in an array where this operation
+                // is a sub-element
+                if (pathOverlaps(b.path, a.path)) {
+                    if (a.type === 'splice') {
+                        a.offset += (b.value.length - b.removals);
+                    } else {}
                 }
-            });
-            return a;
+            }
         });
+        return a;
+    });
 
     B = B.filter(function (b) {
-            // FIXME FALSE POSITIVE
-            return !A.some(function (a) {
+            // if A removed part of the tree you were working on...
+            if (A.some(function (a) {
+                if (a.type === 'remove') {
+                    if (pathOverlaps(a.path, b.path)) {
+                        if (b.path.length - a.path.length > 1) { return true; }
+                    }
+                }
+            })) {
+                // this is weird... FIXME
+                return false;
+            }
+
+            if (!A.some(function (a) {
                 return b.type === 'remove' && deepEqual(a.path, b.path);
-            });
+            })) { return true; }
         })
         .filter(function (b) {
-            // let A win conflicts over b
+            // let A win conflicts over b if no arbiter is supplied here
 
             // Arbiter is required here
             return !A.some(function (a) {
@@ -249,10 +257,7 @@ var resolve = OT.resolve = function (A, B, arbiter) {
             return b;
         });
 
-// TODO: To be equivilent to transform0 (the pluggable transform function)
-//       you would have to return only B. However because A is filtered in this function it is
-//       not enough to change only this line.
-    return A.concat(B);
+    return B;
 };
 
 // A, B, f, path, ops
@@ -397,7 +402,13 @@ var applyOp = OT.applyOp = function (O, op) {
         case "replace":
             key = op.path[op.path.length -1];
             path = op.path.slice(0, op.path.length - 1);
-            find(O, path)[key] = op.value;
+
+            var parent = find(O, path);
+
+            if (!parent) {
+                throw new Error("cannot apply change to non-existent element");
+            }
+            parent[key] = op.value;
             break;
         case "splice":
             var found = find(O, op.path);
@@ -418,6 +429,8 @@ var applyOp = OT.applyOp = function (O, op) {
             path = op.path.slice(0, op.path.length - 1);
             delete find(O, path)[key];
             break;
+        default:
+            throw new Error('unsupported operation type');
     }
 };
 
