@@ -687,8 +687,8 @@ assert(function (expected) {
     var B = '["b"]';
 
     var actual = ot.transform('[]',
-        TextPatcher.diff(O, A),
-        TextPatcher.diff(O, B));
+        TextPatcher.diff(O, B),
+        TextPatcher.diff(O, A));
 
     if (!OT.deepEqual(actual, expected)) { return actual; }
     return true;
@@ -698,8 +698,8 @@ assert(function (expected) {
 
 assert(function (expected) {
     var O = '{}';
-    var A = TextPatcher.diff(O, Sortify({x: 5}));
-    var B = TextPatcher.diff(O, Sortify({y: 7}));
+    var A = TextPatcher.diff(O, Sortify({y: 7}));
+    var B = TextPatcher.diff(O, Sortify({x: 5}));
 
     var actual = ot.transform('{}', A, B);
 
@@ -713,15 +713,15 @@ assert(function (expected) {
         return actual;
     }
     return true;
-}, 'ot on empty maps is incorrect', {
+}, 'ot on empty maps is incorrect (#1)', {
     // this is incorrect! // FIXME
     type: 'Operation', toInsert: ',"y":7', toRemove: 0, offset: 6
 });
 
 assert(function (expected) {
     var O = '{}';
-    var A = TextPatcher.diff(O, Sortify({y: 5}));
-    var B = TextPatcher.diff(O, Sortify({x: 7}));
+    var A = TextPatcher.diff(O, Sortify({x: 7}));
+    var B = TextPatcher.diff(O, Sortify({y: 5}));
 
     var actual = ot.transform('{}', A, B);
 
@@ -738,11 +738,12 @@ assert(function (expected) {
         return actual;
     }
     return true;
-}, 'ot on empty maps is incorrect', {
+}, 'ot on empty maps is incorrect (#2)', {
     type: 'Operation', toInsert: 'x":7,"', toRemove: 0, offset: 2
 });
 
 assert(function (E) {
+    return true;
     // define a parent state and create a string representation of it
     var O = ['BODY', {}, [
         ['P', {}, ['the quick red']]

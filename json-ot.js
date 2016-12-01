@@ -96,7 +96,7 @@ var main = function (OT, TextPatcher, Sortify) {
 
         try {
             // parent state with incoming patch applied
-            var s_A = Operation.apply(toTransform, s_O);
+            var s_A = Operation.apply(transformBy, s_O);
             // parsed incoming state
             var A = JSON.parse(s_A);
         }
@@ -104,7 +104,7 @@ var main = function (OT, TextPatcher, Sortify) {
 
         try {
             // parent state with outgoing patch applied
-            var s_B = Operation.apply(transformBy, s_O);
+            var s_B = Operation.apply(toTransform, s_O);
             // parsed outgoing state
             var B = JSON.parse(s_B);
         }
@@ -187,7 +187,7 @@ var main = function (OT, TextPatcher, Sortify) {
                 }
             }
 
-            var temp = Operation.apply(toTransform, s_O);
+            var temp = Operation.apply(transformBy, s_O);
             temp = Operation.apply(d_C, temp);
 
             //console.log(temp);
