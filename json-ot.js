@@ -90,7 +90,19 @@ var main = function (OT, TextPatcher, Sortify) {
         return null;
     };
 
+    var isCheckpoint = function (op, doc) {
+        return op.offset === 0 &&
+            op.toRemove === doc.length &&
+            op.toInsert === doc;
+    };
+
     var transform = JsonOT.transform = function (s_O, toTransform, transformBy) {
+        if (isCheckpoint(transformBy, s_O)) {
+            console.error("FOUND A CHECKPOINT");
+            console.error("RETURNING INITIAL INTENT");
+            return toTransform;
+        }
+
         try { var O = JSON.parse(s_O); }
         catch (err) { throw new Error("original state was not valid json"); }
 
