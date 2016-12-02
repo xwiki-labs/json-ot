@@ -129,6 +129,14 @@ var main = function (OT, TextPatcher, Sortify) {
             var arbiter = function (p_a, p_b, c) {
                 if (p_a.prev !== p_b.prev) { throw new Error("Parent values don't match!"); }
 
+                /*
+FIXME
+Had trouble with shared editing a <pre> block in the wysywyg.
+This suggests that there's a problem with the arbiter function,
+or perhaps in its usage.
+
+                */
+
                 var o = p_a.prev;
                 var a = p_a.value;
                 var b = p_b.value;
@@ -208,7 +216,7 @@ var main = function (OT, TextPatcher, Sortify) {
             return d_C;
         } catch (err) {
             console.error(temp);
-            console.error(err);
+            console.error(err); // FIXME Path did not exist....
 
             return null;
         }
