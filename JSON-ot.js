@@ -190,6 +190,27 @@ var resolve = OT.resolve = function (A, B, arbiter) {
                 return false;
             }
 
+            /*  remove operations which would no longer make sense
+                for instance, if a replaces an array with a string,
+                that would invalidate a splice operation at that path */
+            if (b.type === 'splice' && A.some(function (a) {
+                if (a.type === 'splice' && pathOverlaps(a.path, b.path)) {
+                    if (a.path.length - b.path.length < 0) {
+                        if (!a.removals) { return; }
+
+                        var start = a.offset;
+                        var end = a.offset + a.removals;
+
+                        for (;start < end; start++) {
+                            if (start === b.path[a.path.length]) {
+                                // b is a descendant of a removal
+                                return true;
+                            }
+                        }
+                    }
+                }
+            })) { return false; }
+
             if (!A.some(function (a) {
                 return b.type === 'remove' && deepEqual(a.path, b.path);
             })) { return true; }
@@ -416,13 +437,12 @@ var applyOp = OT.applyOp = function (O, op) {
                 console.error("[applyOp] expected path [%s] to exist in object", op.path.join(','));
                 throw new Error("Path did not exist");
             }
-            //found.splice(op.offset, op.removals, op.value);
-            //console.log(found);
 
-            if (type(found) !== 'array') { throw new Error("Can't splice non-array"); }
+            if (type(found) !== 'array') {
+                throw new Error("Can't splice non-array");
+            }
 
             Array.prototype.splice.apply(found, [op.offset, op.removals].concat(op.value));
-            //console.log(found);
             break;
         case "remove":
             key = op.path[op.path.length -1];
