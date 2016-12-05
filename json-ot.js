@@ -1,6 +1,6 @@
 (function (window) {
 var main = function (OT, TextPatcher, Sortify) {
-    //var ChainPad = window.ChainPad;
+    var ChainPad = window.ChainPad;
     var Operation = ChainPad.Operation;
 
     var JsonOT = {};
@@ -36,8 +36,8 @@ var main = function (OT, TextPatcher, Sortify) {
         var resultOp, text2, text3;
         try {
             // text = O (mutual common ancestor)
-            // toTransform = A (the first incoming operation)
-            // transformBy = B (the second incoming operation)
+            // toTransform = A (your own operation)
+            // transformBy = B (the incoming operation)
             // threeway merge (0, A, B)
 
             resultOp = ChainPad.Operation.transform0(text, toTransform, transformBy);
