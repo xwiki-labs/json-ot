@@ -98,29 +98,57 @@ var main = function (OT, TextPatcher, Sortify) {
 
     var transform = JsonOT.transform = function (s_O, toTransform, transformBy) {
         if (isCheckpoint(transformBy, s_O)) {
-            console.error("FOUND A CHECKPOINT");
-            console.error("RETURNING INITIAL INTENT");
+        /*  One of your peers sent a checkpoint
+            this should have no effect on your current op */
+            console.log('transforming on a checkpoint');
             return toTransform;
         }
+        if (isCheckpoint(toTransform, s_O)) {
+        /*  You're trying to send a checkpoint while receiving a patch
+        */
+            console.log("Pushing our own checkpoing through");
+            return transformBy;
+        }
 
-        try { var O = JSON.parse(s_O); }
-        catch (err) { throw new Error("original state was not valid json"); }
+        var msg;
+
+        var O;
+        var s_A;
+        var A;
+        var s_B;
+        var B;
+
+        var temp;
+        try { O = JSON.parse(s_O); }
+        catch (err) {
+            msg = "original state was not valid json";
+            console.error(msg);
+            throw new Error(msg);
+        }
 
         try {
             // parent state with incoming patch applied
-            var s_A = Operation.apply(transformBy, s_O);
+            s_A = Operation.apply(transformBy, s_O);
             // parsed incoming state
-            var A = JSON.parse(s_A);
+            A = JSON.parse(s_A);
         }
-        catch (err) { throw new Error('outgoing patch would result in invalid json'); }
+        catch (err) {
+            msg = 'incoming patch would result in invalid json';
+            console.error(msg);
+            throw new Error(msg);
+        }
 
         try {
             // parent state with outgoing patch applied
-            var s_B = Operation.apply(toTransform, s_O);
+            s_B = Operation.apply(toTransform, s_O);
             // parsed outgoing state
-            var B = JSON.parse(s_B);
+            B = JSON.parse(s_B);
         }
-        catch (err) { throw new Error("wut"); }
+        catch (err) {
+            msg = 'outgoing patch would result in invalid json';
+            console.error(msg);
+            throw new Error(msg);
+        }
 
         try {
             // apply the concerned operations, yielding stringified json
@@ -155,11 +183,10 @@ or perhaps in its usage.
 
                 /*  Apply the transformed operation to the result of the incoming op
                 */
+                console.log(o_x);
                 var x3 = Operation.apply(o_x, x2);
 
-                p_a.value = x3;
-
-                return true;
+                p_b.value = x3;
             };
 
             // Diff of incoming state and parent state
@@ -169,11 +196,7 @@ or perhaps in its usage.
             var o_B = OT.diff(O, B);
 
             // resolve changesets of A and B
-
-            /*  FIXME reversed these because otherwise splices happen in the wrong order
-                [b, a] instead of [a, b] */
-
-            var C = OT.resolve(o_A, o_B, arbiter, true);
+            var C = OT.resolve(o_A, o_B, arbiter);
 
             // Patch O for both sets of changes
             OT.patch(O, o_A);
@@ -184,40 +207,26 @@ or perhaps in its usage.
             // isolate the merge artifact
             var d_C = TextPatcher.diff(s_A, s_C);
 
-            if (d_C && false) {
-                var delta = Operation.lengthChange(toTransform);
-                var offset = d_C.offset - delta;
-
-                var debugThis = 0;
-
-                if (toTransform.offset < d_C.offset && ChainPad.Common.isUint(offset)) {
-                    if (debugThis) {
-                        console.log('transforming for: %s', s_O);
-                        console.log(d_C);
-                        console.log(toTransform);
-
-                        console.log("result");
-                    }
-
-                    d_C.offset = offset;
-                    if (debugThis) {
-                        console.log(d_C);
-                        console.log();
-                    }
-                }
+            if (!d_C) {
+                msg = "Your operation was negated by an incoming operation";
+                //console.error(msg);
+                return null;
             }
 
-            var temp = Operation.apply(transformBy, s_O);
+            temp = Operation.apply(transformBy, s_O);
             temp = Operation.apply(d_C, temp);
 
-            //console.log(temp);
-            JSON.parse(temp);
+            try {
+                JSON.parse(temp);
+            } catch (err) {
+                console.error("transformed operation resulted in invalid json");
+                throw err;
+            }
 
             return d_C;
         } catch (err) {
             console.error(temp);
-            console.error(err); // FIXME Path did not exist....
-
+            console.error(err); // FIXME Path did not exist...
             return null;
         }
     };
