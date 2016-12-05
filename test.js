@@ -794,6 +794,55 @@ assert(function (E) {
     ]]
 );
 
+assert(function (E) {
+    var O = ['BODY', {},
+        ['P', {}, [
+            ['STRONG', {}, ['bold']]
+        ]]
+    ];
+    var s_O = Sortify(O);
+
+    var A = OT.clone(O);
+    A[2][2][0] = 'pewpew';
+    var s_A = Sortify(A);
+
+    var d_A = TextPatcher.diff(s_O, s_A);
+
+    var B = OT.clone(O);
+    B[2][2][0][2] = 'bolded text';
+
+    var s_B = Sortify(B);
+    var d_B = TextPatcher.diff(s_O, s_B);
+
+    var op = ot.transform(s_O, d_B, d_A);
+
+    var changes = (function () {
+        var d_A = OT.diff(O, A);
+        var d_B = OT.diff(O, B);
+
+        var changes = OT.resolve(d_A, d_B);
+
+        return changes;
+    }());
+
+    /*  we expect that b will have been cancelled by its parent's removal */
+    if (changes.length) { return changes; }
+
+    if (!op) {
+        /*  Your outgoing operation was cancelled by the incoming one
+            so just apply the incoming one and DEAL WITH IT */
+        var temp = ChainPad.Operation.apply(d_A, s_O);
+        var parsed = JSON.parse(temp);
+
+        if (!OT.deepEqual(parsed, E)) { return parsed; }
+        return true;
+    }
+}, "failed OT on removing parent branch",
+    ['BODY', {},
+        ['P', {}, ["pewpew"]]
+    ]
+);
+
 runASSERTS();
 
 if (failed) {
