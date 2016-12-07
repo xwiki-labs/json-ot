@@ -96,6 +96,54 @@ var main = function (OT, TextPatcher, Sortify) {
             op.toInsert === doc;
     };
 
+    /*  FIXME
+        Had trouble with shared editing a <pre> block in the wysywyg.
+        This suggests that there's a problem with the arbiter function,
+        or perhaps in its usage.  */
+
+    // arbiter function determines what to do in case of conflicts
+    var arbiter = function (p_a, p_b, c) {
+        if (p_a.prev !== p_b.prev) { throw new Error("Parent values don't match!"); }
+
+        //console.log("patching on the same string!");
+
+        //console.log(p_b);
+
+        var o = p_a.prev;
+
+        //console.log("previous text:");
+        //console.log(o);
+
+        var a = p_a.value;
+        var b = p_b.value;
+
+        console.log("ARBITER");
+
+        var o_a = TextPatcher.diff(o, a);
+        var o_b = TextPatcher.diff(o, b);
+
+        /*  given the parent text, the op to transform, and the incoming op
+            return a transformed operation which takes the incoming
+            op into account */
+        var o_x = Operation.transform0(o, o_b, o_a);
+
+        // operations can be cancelled in transformation
+        // if so, return 'true' to filter it from your changeset
+        if (!o_x) { return true; }
+
+        /*  Apply the incoming operation to the parent text
+        */
+        var x2 = Operation.apply(o_a, o);
+
+        /*  Apply the transformed operation to the result of the incoming op
+        */
+        //console.log(o_x);
+        var x3 = Operation.apply(o_x, x2);
+
+        p_b.value = x3;
+        console.log(o_x);
+    };
+
     var transform = JsonOT.transform = function (s_O, toTransform, transformBy) {
         if (isCheckpoint(transformBy, s_O)) {
         /*  One of your peers sent a checkpoint
@@ -151,44 +199,6 @@ var main = function (OT, TextPatcher, Sortify) {
         }
 
         try {
-            // apply the concerned operations, yielding stringified json
-
-            // arbiter function determines what to do in case of conflicts
-            var arbiter = function (p_a, p_b, c) {
-                if (p_a.prev !== p_b.prev) { throw new Error("Parent values don't match!"); }
-
-                /*
-FIXME
-Had trouble with shared editing a <pre> block in the wysywyg.
-This suggests that there's a problem with the arbiter function,
-or perhaps in its usage.
-
-                */
-
-                var o = p_a.prev;
-                var a = p_a.value;
-                var b = p_b.value;
-
-                var o_a = TextPatcher.diff(o, a);
-                var o_b = TextPatcher.diff(o, b);
-
-                /*  given the parent text, the op to transform, and the incoming op
-                    return a transformed operation which takes the incoming
-                    op into account */
-                var o_x = Operation.transform0(o, o_b, o_a);
-
-                /*  Apply the incoming operation to the parent text
-                */
-                var x2 = Operation.apply(o_a, o);
-
-                /*  Apply the transformed operation to the result of the incoming op
-                */
-                console.log(o_x);
-                var x3 = Operation.apply(o_x, x2);
-
-                p_b.value = x3;
-            };
-
             // Diff of incoming state and parent state
             var o_A = OT.diff(O, A);
 
@@ -197,6 +207,8 @@ or perhaps in its usage.
 
             // resolve changesets of A and B
             var C = OT.resolve(o_A, o_B, arbiter);
+
+            console.log(C);
 
             // Patch O for both sets of changes
             OT.patch(O, o_A);
