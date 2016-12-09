@@ -1,6 +1,6 @@
 (function (window) {
 var main = function (OT, TextPatcher, Sortify) {
-    var ChainPad = window.ChainPad;
+    //var ChainPad = window.ChainPad;
     var Operation = ChainPad.Operation;
 
     var JsonOT = {};
@@ -105,19 +105,14 @@ var main = function (OT, TextPatcher, Sortify) {
     var arbiter = function (p_a, p_b, c) {
         if (p_a.prev !== p_b.prev) { throw new Error("Parent values don't match!"); }
 
-        //console.log("patching on the same string!");
-
-        //console.log(p_b);
-
+        if (c === OT.cases.splice.splice) {
+            console.log(p_a);
+            console.log(p_b);
+            return true;
+        }
         var o = p_a.prev;
-
-        //console.log("previous text:");
-        //console.log(o);
-
         var a = p_a.value;
         var b = p_b.value;
-
-        console.log("ARBITER");
 
         var o_a = TextPatcher.diff(o, a);
         var o_b = TextPatcher.diff(o, b);
@@ -137,14 +132,13 @@ var main = function (OT, TextPatcher, Sortify) {
 
         /*  Apply the transformed operation to the result of the incoming op
         */
-        //console.log(o_x);
+
         var x3 = Operation.apply(o_x, x2);
 
         p_b.value = x3;
-        console.log(o_x);
     };
 
-    var transform = JsonOT.transform = function (s_O, toTransform, transformBy) {
+    var transform = JsonOT.transform = function (s_O, toTransform, transformBy, debug) {
         if (isCheckpoint(transformBy, s_O)) {
         /*  One of your peers sent a checkpoint
             this should have no effect on your current op */
@@ -205,10 +199,17 @@ var main = function (OT, TextPatcher, Sortify) {
             // Diff of outgoing state and parent state
             var o_B = OT.diff(O, B);
 
+            if (debug) {
+                console.error(o_A);
+                console.error(o_B);
+            }
+
             // resolve changesets of A and B
             var C = OT.resolve(o_A, o_B, arbiter);
 
-            console.log(C);
+            if (debug) {
+                console.log(C);
+            }
 
             // Patch O for both sets of changes
             OT.patch(O, o_A);
@@ -235,9 +236,15 @@ var main = function (OT, TextPatcher, Sortify) {
                 throw err;
             }
 
+            console.log({
+                O: s_O,
+                o_A: transformBy,
+                o_B: toTransform,
+                C: d_C,
+            });
+
             return d_C;
         } catch (err) {
-            console.error(temp);
             console.error(err); // FIXME Path did not exist...
             return null;
         }

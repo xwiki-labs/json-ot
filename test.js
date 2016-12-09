@@ -648,7 +648,6 @@ assert(function (expected) {
     }
     return true;
 }, "diff/patching strings with overlaps", ["powpow bang"]);
-
 // TODO
 assert(function () {
     var O = {
@@ -696,6 +695,26 @@ assert(function (expected) {
     { type: 'Operation', offset: 4, toInsert: ',"b"', toRemove: 0 }
 );
 
+assert(function (E) {
+    var O = Sortify(['pewpew']);
+    var A = Sortify(['pewpew bang']);
+    var o_A = TextPatcher.diff(O, A);
+
+    var B = Sortify(['powpow']);
+    var o_B = TextPatcher.diff(O, B);
+
+    var actual = ot.transform(O, o_B, o_A); //, true);
+
+    var R = ChainPad.Operation.apply(o_A, O);
+    R = ChainPad.Operation.apply(actual, R);
+
+    if (R !== E) {
+        return R;
+    }
+
+    return true;
+}, "transforming concurrent edits to a single string didn't work", '["powpow bang"]');
+
 assert(function (expected) {
     var O = '{}';
     var A = TextPatcher.diff(O, Sortify({y: 7}));
@@ -741,6 +760,100 @@ assert(function (expected) {
 }, 'ot on empty maps is incorrect (#2)', {
     type: 'Operation', toInsert: 'x":7,"', toRemove: 0, offset: 2
 });
+
+var checkTransform = function (O, A, B, E, M) {
+    assert(function () {
+        var s_O = Sortify(O);
+
+        var o_a = TextPatcher.diff(s_O, Sortify(A));
+        var o_b = TextPatcher.diff(s_O, Sortify(B));
+
+        var o_c = ot.transform(s_O, o_b, o_a);
+
+        var doc = ChainPad.Operation.apply(o_a, s_O);
+        doc = ChainPad.Operation.apply(o_c, doc);
+
+        var result;
+        try { result = JSON.parse(doc); }
+        catch (e) { return e; }
+
+        if (!OT.deepEqual(result, E)) {
+            return result;
+        }
+        return true;
+    }, M || "", E);
+};
+
+checkTransform(
+    ['BODY', {}, [
+        ['P', {}, [['BR', {}, []]],
+        ['P', {}, ['quick red fox']]
+    ]]],
+    ['BODY', {}, [
+        ['P', {}, [['BR', {}, []]],
+        ['P', {}, ['The quick red fox']]
+    ]]],
+
+    ['BODY', {}, [
+        ['P', {}, [['BR', {}, []]],
+        ['P', {}, ['quick red fox jumped over the lazy brown dog']]
+    ]]],
+
+    ['BODY', {}, [
+        ['P', {}, [['BR', {}, []]],
+        ['P', {},
+            [ 'The quick red fox jumped over the lazy brown dog'],
+        ]
+    ]]],
+
+    'ot on the same paragraph failed');
+
+var show = function (o) {
+    console.log(JSON.stringify(o, null, 2));
+};
+
+var debugOutput = function (obj) {
+    console.log(obj.o_A);
+
+    var A = JSON.parse(ChainPad.Operation.apply(obj.o_A, obj.O));
+    show(A);
+
+    var B = JSON.parse(ChainPad.Operation.apply(obj.o_B, obj.O));
+    show(B);
+
+    checkTransform(JSON.parse(obj.O),
+        A,
+        B,
+
+        null,
+        'umm');
+};
+
+
+debugOutput({
+  "O": "[\"BODY\",{\"class\":\"cke_editable cke_editable_themed cke_contents_ltr cke_show_borders\",\"contenteditable\":\"true\",\"spellcheck\":\"false\",\"style\":\"color: unset; background-color: unset;\"},[[\"P\",{},[[\"BR\",{},[]]]],[\"P\",{},[\"[  The quick red f ]\",[\"BR\",{},[]]]]],{\"metadata\":{\"defaultTitle\":\"Pad - Fri Dec 09 2016\",\"title\":\"Pad - Fri Dec 09 2016\",\"users\":{\"08fdadf3a493d5abbdb0e35858b5ed37\":{\"name\":\"ansuz\"},\"2b3eaea6fe4a571fba038bb24e77658c\":{\"name\":\"ansuz\"}}}}]",
+  "o_A": {
+    "type": "Operation",
+    "offset": 235,
+    "toRemove": 1,
+    "toInsert": "ox  "
+  },
+  "o_B": {
+    "type": "Operation",
+    "offset": 218,
+    "toRemove": 1,
+    "toInsert": " t"
+  },
+  "C": {
+    "type": "Operation",
+    "offset": 218,
+    "toInsert": " t",
+    "toRemove": 1
+  }
+});
+
+
+
 
 assert(function (E) {
     return true;
