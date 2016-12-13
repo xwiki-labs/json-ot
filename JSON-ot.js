@@ -257,7 +257,7 @@ var resolve = OT.resolve = function (A, B, arbiter) {
                     if (pathOverlaps(a.path, b.path)) {
                       // TODO validate that this isn't an off-by-one error
                         var pos = a.path.length;
-                        if (typeof(b.path[pos]) === 'number' && a.offset <= b.path[pos]) {
+                        if (typeof(b.path[pos]) === 'number' && a.offset <= b.path[pos]) { // FIXME a.value is undefined
                             b.path[pos] += (a.value.length - a.removals);
                         }
                     }
@@ -380,7 +380,7 @@ var arrays = OT.arrays = function (A_orig, B, path, ops) {
       commonEnd++;
     }
     var toRemove = A.length - commonStart - commonEnd;
-    var toInsert;
+    var toInsert = [];
     if (B.length !== commonStart + commonEnd) {
       toInsert = B.slice(commonStart, B.length - commonEnd);
     }
