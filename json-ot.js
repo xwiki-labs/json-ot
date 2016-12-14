@@ -236,7 +236,7 @@ var main = function (OT, TextPatcher, Sortify) {
                 throw err;
             }
 
-            console.log({
+            0 && console.log({
                 O: s_O,
                 o_A: transformBy,
                 o_B: toTransform,
@@ -255,13 +255,13 @@ var main = function (OT, TextPatcher, Sortify) {
 
     if (typeof(module) !== 'undefined' && module.exports) {
         module.exports = main(
-            require("./JSON-ot.js"),
+            require("./transform.js"),
             require("textpatcher"),
             require("json.sortify"),
             require("chainpad/chainpad.dist.js"));
     } else if ((typeof(define) !== 'undefined' && define !== null) && (define.amd !== null)) {
         define([
-            '/bower_components/chainpad-json-validator/JSON-ot.js',
+            '/bower_components/chainpad-json-validator/transform.js',
             '/bower_components/textpatcher/TextPatcher.js',
             'json.sortify',
             '/bower_components/chainpad/chainpad.dist.js',

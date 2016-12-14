@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-var OT = require("./JSON-ot");
+var OT = require("./transform");
 var TextPatcher = require("textpatcher");
 require("chainpad/chainpad.dist");
 var Sortify = require("json.sortify");
@@ -784,7 +784,12 @@ var checkTransform = function (O, A, B, E, M) {
     }, M || "", E);
 };
 
-checkTransform(
+var goesBothWays = function (O, A, B, E, M) {
+    checkTransform(O, A, B, E, M);
+    checkTransform(O, B, A, E, M);
+};
+
+goesBothWays(
     ['BODY', {}, [
         ['P', {}, [['BR', {}, []]],
         ['P', {}, ['quick red fox']]
@@ -808,6 +813,7 @@ checkTransform(
 
     'ot on the same paragraph failed');
 
+
 var show = function (o) {
     console.log(JSON.stringify(o, null, 2));
 };
@@ -830,7 +836,7 @@ var debugOutput = function (obj) {
 };
 
 
-debugOutput({
+0 && debugOutput({
   "O": "[\"BODY\",{\"class\":\"cke_editable cke_editable_themed cke_contents_ltr cke_show_borders\",\"contenteditable\":\"true\",\"spellcheck\":\"false\",\"style\":\"color: unset; background-color: unset;\"},[[\"P\",{},[[\"BR\",{},[]]]],[\"P\",{},[\"[  The quick red f ]\",[\"BR\",{},[]]]]],{\"metadata\":{\"defaultTitle\":\"Pad - Fri Dec 09 2016\",\"title\":\"Pad - Fri Dec 09 2016\",\"users\":{\"08fdadf3a493d5abbdb0e35858b5ed37\":{\"name\":\"ansuz\"},\"2b3eaea6fe4a571fba038bb24e77658c\":{\"name\":\"ansuz\"}}}}]",
   "o_A": {
     "type": "Operation",
